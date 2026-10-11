@@ -33,7 +33,7 @@ fi
   printf "\033[31m           expected a ghcr.io/institut-du-numerique-responsable/perf-sentinel tag or digest, or a local perf-sentinel:<ver>-<sha> pin\033[0m\n" >&2
   exit 1
 }
-KPS_CHART_VERSION="91.8.0"
+KPS_CHART_VERSION="92.3.0"
 TEMPO_IMAGE_VERSION="3.0.0"
 OTEL_CHART_VERSION="0.173.1"
 
