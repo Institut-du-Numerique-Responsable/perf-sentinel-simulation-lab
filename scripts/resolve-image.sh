@@ -30,9 +30,9 @@
 if [ -n "${PERF_SENTINEL_IMAGE:-}" ]; then
   IMAGE="${PERF_SENTINEL_IMAGE}"
 elif [ -n "${PERF_SENTINEL_VERSION:-}" ]; then
-  IMAGE="ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}"
+  IMAGE="ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}"
 else
-  IMAGE="$(awk '/^[[:space:]]*image:[[:space:]]*(ghcr\.io\/robintra\/)?perf-sentinel[:@]/ { print $2; exit }' \
+  IMAGE="$(awk '/^[[:space:]]*image:[[:space:]]*(ghcr\.io\/institut-du-numerique-responsable\/)?perf-sentinel[:@]/ { print $2; exit }' \
     "${LAB_ROOT:?resolve-image.sh: LAB_ROOT must be set}/manifests/perf-sentinel-daemon.yaml")"
   # Not `die`: the colour helpers are not defined yet at every call site.
   [ -n "${IMAGE}" ] || {

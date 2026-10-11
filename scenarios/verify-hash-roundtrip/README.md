@@ -6,7 +6,7 @@ redesigned to 0/1/2/3/4).
 
 ## What it covers
 
-7 sub-tests run inside `ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}`
+7 sub-tests run inside `ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}`
 (defaults to the lab's currently-pinned version):
 
 1. **Placeholder hash detection** (exit 1, UNTRUSTED).

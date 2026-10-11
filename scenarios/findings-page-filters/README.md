@@ -44,7 +44,7 @@ reads the API's filters; `grouping-metrics-split` pins the same value on
 ## Why three legs are A/B runs
 
 Legs A, B, C and E each carry a counter-proof against
-`ghcr.io/robintra/perf-sentinel:0.20.2`, and leg D *is* one.
+`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`, and leg D *is* one.
 
 That is not belt and braces. A leg that passes on both builds proves nothing
 about the new one, and this lab has shipped that exact mistake: the 0.20.2
@@ -120,7 +120,7 @@ Knobs:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `BASELINE_IMAGE` | `ghcr.io/robintra/perf-sentinel:0.20.2` | the A side of every comparison, bump it with the pin in `manifests/perf-sentinel-daemon.yaml` |
+| `BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2` | the A side of every comparison, bump it with the pin in `manifests/perf-sentinel-daemon.yaml` |
 | `FPF_DAEMON_HTTP_PORT` / `FPF_DAEMON_GRPC_PORT` | `14828` / `14827` | loopback ports of the daemon under test |
 | `FPF_BASELINE_HTTP_PORT` | `14838` | published port of the baseline container |
 | `FPF_SEED_A` / `FPF_SEED_B` | `4321` / `9876` | tracegen seeds, one per tenant |

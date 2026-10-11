@@ -1624,11 +1624,11 @@ per-window NDJSON archive. The **positive** control is a graceful
 flushed. The **negative** control is an ungraceful `SIGKILL` of the
 daemon PID via `docker exec <node> kill -9`, where it is lost. Tests
 the image under test (`SIGTERM_DRAIN_IMAGE`, default
-`ghcr.io/robintra/perf-sentinel:0.8.5`). On a 0.8.4 daemon the
+`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.8.5`). On a 0.8.4 daemon the
 positive control FAILs by design, which is the counter-check.
 
 ```bash
-make verify-daemon-sigterm-drain   # default: ghcr.io/robintra/perf-sentinel:0.8.5
+make verify-daemon-sigterm-drain   # default: ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.8.5
 ```
 
 ### daemon-analysis-shedding
@@ -3020,7 +3020,7 @@ findings page.
   the block's real count, total and parallel estimate.
 
 Legs A, B, C and E each carry a counter-proof against
-`ghcr.io/robintra/perf-sentinel:0.20.2`, and leg D is one. That is the
+`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`, and leg D is one. That is the
 point of the scenario, not extra caution: 0.20.2 ignores an unknown
 query parameter and answers the whole listing, so with a single tenant
 leg A would read the same number on both builds and pass on either.

@@ -22,7 +22,7 @@ Either free the port or edit `cluster/k3d-config.yaml` to map a
 different host port (for example `3001:3000`), then run
 `make reset`.
 
-## `docker pull ghcr.io/robintra/perf-sentinel:0.5.16` fails
+## `docker pull ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.16` fails
 
 Most likely the GHCR image is private or requires a specific account.
 Authenticate docker against GHCR:
@@ -98,7 +98,7 @@ ctr: content digest sha256:...: not found
 ```
 
 `manifests/perf-sentinel-daemon.yaml` references the GHCR image
-directly (`ghcr.io/robintra/perf-sentinel:0.5.4`), so kubelets can
+directly (`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.4`), so kubelets can
 pull at run time. `bootstrap.sh` continues even if the k3d import
 fails.
 
@@ -107,8 +107,8 @@ cluster:
 
 ```bash
 make down
-docker rmi ghcr.io/robintra/perf-sentinel:0.5.4
-docker pull ghcr.io/robintra/perf-sentinel:0.5.4
+docker rmi ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.4
+docker pull ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.4
 make up
 ```
 
@@ -141,7 +141,7 @@ kubectl -n observability logs -l app.kubernetes.io/name=perf-sentinel-daemon --p
 Causes seen in practice:
 
 - Image not available to the cluster: re-run
-  `k3d image import ghcr.io/robintra/perf-sentinel:0.5.4 -c perf-sentinel-lab`
+  `k3d image import ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.4 -c perf-sentinel-lab`
   or check that the kubelet can reach GHCR.
 - Invalid TOML config: check the key names in
   `manifests/perf-sentinel-daemon.yaml` (`[detection]` not `[detect]`,
@@ -472,7 +472,7 @@ the daemon).
 
 ```bash
 make down
-docker rmi ghcr.io/robintra/perf-sentinel:0.5.4
+docker rmi ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.4
 docker volume prune
 rm -f .postgres-password
 make up

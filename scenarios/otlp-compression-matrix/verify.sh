@@ -32,7 +32,7 @@ LAB_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # PERF_SENTINEL_IMAGE). BASELINE_IMAGE = the last release that carried the bug;
 # without it a green run cannot tell "fixed" from "never exercised".
 . "${LAB_ROOT}/scripts/resolve-image.sh"
-BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/robintra/perf-sentinel:0.9.26}"
+BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.9.26}"
 COLLECTOR_IMAGE="${COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.155.0}"
 TRACEGEN_IMAGE="${TRACEGEN_IMAGE:-lab-tracegen:1}"
 

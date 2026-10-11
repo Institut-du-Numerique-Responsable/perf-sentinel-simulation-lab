@@ -129,7 +129,7 @@ docker run --rm \
   --network host \
   -v "${TRACES_FIXTURE}:/input/traces.json:ro" \
   -v /tmp/pg-stat:/output \
-  ghcr.io/robintra/perf-sentinel:0.5.21 \
+  ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.21 \
   report \
     --input /input/traces.json \
     --pg-stat-prometheus "http://localhost:9090" \
@@ -141,7 +141,7 @@ docker run --rm \
   --add-host=host.docker.internal:host-gateway \
   -v "${TRACES_FIXTURE}:/input/traces.json:ro" \
   -v /tmp/pg-stat:/output \
-  ghcr.io/robintra/perf-sentinel:0.5.21 \
+  ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.21 \
   report \
     --input /input/traces.json \
     --pg-stat-prometheus "http://host.docker.internal:9090" \

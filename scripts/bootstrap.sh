@@ -14,7 +14,7 @@ cd "${REPO_ROOT}"
 CLUSTER_NAME="perf-sentinel-lab"
 # Match both tag pin (`...perf-sentinel:0.5.16`) and digest pin
 # (`...perf-sentinel@sha256:abc...`); the manifest switched to digest in 0.5.18.
-PERF_SENTINEL_IMAGE=$(awk '/^[[:space:]]*image:[[:space:]]*ghcr\.io\/robintra\/perf-sentinel[:@]/ { print $2; exit }' \
+PERF_SENTINEL_IMAGE=$(awk '/^[[:space:]]*image:[[:space:]]*ghcr\.io\/institut-du-numerique-responsable\/perf-sentinel[:@]/ { print $2; exit }' \
   "${REPO_ROOT}/manifests/perf-sentinel-daemon.yaml")
 # A pre-release validation leaves a LOCAL pin behind (`image: perf-sentinel:<ver>-<sha>`,
 # see scripts/seed-daemon-local.sh), and that is a legitimate working-tree state.
@@ -30,7 +30,7 @@ if [ -z "${PERF_SENTINEL_IMAGE}" ] \
 fi
 [ -n "${PERF_SENTINEL_IMAGE}" ] || [ "${PERF_SENTINEL_LOCAL_PIN:-0}" = "1" ] || {
   printf "\033[31m    error: failed to extract perf-sentinel image from manifests/perf-sentinel-daemon.yaml\033[0m\n" >&2
-  printf "\033[31m           expected a ghcr.io/robintra/perf-sentinel tag or digest, or a local perf-sentinel:<ver>-<sha> pin\033[0m\n" >&2
+  printf "\033[31m           expected a ghcr.io/institut-du-numerique-responsable/perf-sentinel tag or digest, or a local perf-sentinel:<ver>-<sha> pin\033[0m\n" >&2
   exit 1
 }
 KPS_CHART_VERSION="91.8.0"

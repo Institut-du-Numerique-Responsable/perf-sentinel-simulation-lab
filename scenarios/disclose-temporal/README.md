@@ -21,7 +21,7 @@ PERF_SENTINEL_VERSION=v0.8.3-rc make verify-disclose-temporal
 ```
 
 Hermetic CLI scenario (no cluster): `docker run
-ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION:-0.8.3} disclose` over the
+ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION:-0.8.3} disclose` over the
 committed fixtures.
 
 ## Sub-tests

@@ -39,7 +39,7 @@ PERF_SENTINEL_LOCAL_BIN="${PERF_SENTINEL_LOCAL_BIN:-${PERF_SENTINEL_REPO_PATH}/t
 # The A side of the comparison: the last release without
 # slow_query_window_minutes, which 0.23.0 added. It stays below 0.23.0. Bumped
 # to the release under test, leg 5 passes on both builds and proves nothing.
-BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/robintra/perf-sentinel:0.22.2}"
+BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.22.2}"
 BASELINE_NAME="swcb-baseline-$$"
 
 ON_HTTP="${SWCB_ON_HTTP_PORT:-14868}"

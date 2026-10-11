@@ -74,7 +74,7 @@ Knobs:
   Defaults to the pin in `manifests/perf-sentinel-daemon.yaml` via
   `scripts/resolve-image.sh`.
 - `BASELINE_IMAGE`: the counter-proof image, default
-  `ghcr.io/robintra/perf-sentinel:0.9.26`. It must be a build that
+  `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.9.26`. It must be a build that
   predates the fix, otherwise legs B and F′ fail by design.
 - `TRACES`, `COLLECTOR_IMAGE`, `DAEMON_HTTP_PORT`, `COLLECTOR_HTTP_PORT`,
   `COLLECTOR_HEALTH_PORT`.

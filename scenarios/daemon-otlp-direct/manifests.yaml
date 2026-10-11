@@ -104,7 +104,7 @@ spec:
           # verify.sh substitutes this line with the image under validation
           # (scripts/resolve-image.sh). The pin below is only the fallback for a
           # manual `kubectl apply -f` of this file.
-          image: ghcr.io/robintra/perf-sentinel@sha256:a68a1db1b5fca61772375c6919e336195d940c417b02e549888c25bf80446a59  # placeholder, verify.sh rewrites it to the image under validation
+          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:a68a1db1b5fca61772375c6919e336195d940c417b02e549888c25bf80446a59  # placeholder, verify.sh rewrites it to the image under validation
           imagePullPolicy: IfNotPresent
           args:
             - watch

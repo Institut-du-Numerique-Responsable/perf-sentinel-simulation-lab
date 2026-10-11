@@ -145,7 +145,7 @@ Allocate at least 12 GiB to Docker Desktop when chaining S1 + S2 + S3.
 | distroless/java25 (runtime) | nonroot | gcr.io/distroless/java25 |
 | k6 | 1.7.1 | grafana/k6:1.7.1 |
 | GitLab CE chart | 9.11.2 | helm repo gitlab |
-| perf-sentinel | 0.5.16 | ghcr.io/robintra/perf-sentinel |
+| perf-sentinel | 0.5.16 | ghcr.io/institut-du-numerique-responsable/perf-sentinel |
 
 ## Note on daemon memory
 

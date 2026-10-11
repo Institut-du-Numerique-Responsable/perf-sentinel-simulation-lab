@@ -84,9 +84,9 @@ jobs:
           # validated version is the unit of interest, not the digest of a
           # yet-untested image. Firing unconditionally also keeps the default
           # path working when the manifest is digest-pinned.
-          sed -i -E "s|ghcr.io/robintra/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
+          sed -i -E "s|ghcr.io/institut-du-numerique-responsable/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
             manifests/perf-sentinel-daemon.yaml
-          grep "ghcr.io/robintra/perf-sentinel" manifests/perf-sentinel-daemon.yaml
+          grep "ghcr.io/institut-du-numerique-responsable/perf-sentinel" manifests/perf-sentinel-daemon.yaml
 
       - name: Provision Electricity Maps token file from repo secret
         env:
@@ -248,7 +248,7 @@ jobs:
             curl -fsS http://localhost:14318/api/status >/dev/null 2>&1 && break
             sleep 1
           done
-          SIGTERM_DRAIN_IMAGE="ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}" make verify-daemon-sigterm-drain
+          SIGTERM_DRAIN_IMAGE="ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}" make verify-daemon-sigterm-drain
 
       - name: B1 templates (LOCAL ONLY, surface as notices)
         # Notices instead of warnings: these 3 scenarios are
@@ -339,7 +339,7 @@ jobs:
       - name: Patch perf-sentinel image to validated version
         if: env.PERF_SENTINEL_VERSION != 'latest'
         run: |
-          sed -i -E "s|ghcr.io/robintra/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
+          sed -i -E "s|ghcr.io/institut-du-numerique-responsable/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
             manifests/perf-sentinel-daemon.yaml
 
       - name: Provision Electricity Maps token
@@ -555,7 +555,7 @@ jobs:
 
       - name: Patch perf-sentinel image to validated version
         run: |
-          sed -i -E "s|ghcr.io/robintra/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
+          sed -i -E "s|ghcr.io/institut-du-numerique-responsable/perf-sentinel(@sha256:[a-f0-9]+\|:[0-9.]+)|ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}|g" \
             manifests/perf-sentinel-daemon.yaml
 
       - name: Provision Electricity Maps token
@@ -745,7 +745,7 @@ jobs:
               `cd ~/IdeaProjects/perf-sentinel-simulation-lab`,
               `make validate  # offline gate, no cluster: rule this out first`,
               `# Patch perf-sentinel image to ${version}`,
-              `sed -i '' "s|ghcr.io/robintra/perf-sentinel:[0-9.]*|ghcr.io/robintra/perf-sentinel:${version}|g" manifests/perf-sentinel-daemon.yaml`,
+              `sed -i '' "s|ghcr.io/institut-du-numerique-responsable/perf-sentinel:[0-9.]*|ghcr.io/institut-du-numerique-responsable/perf-sentinel:${version}|g" manifests/perf-sentinel-daemon.yaml`,
               `make reset-cni  # ou make up-cni si pas de cluster`,
               `make seed-services && make seed-electricity-maps`,
               `make validate-findings`,

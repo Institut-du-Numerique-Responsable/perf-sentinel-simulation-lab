@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLUSTER_NAME="perf-sentinel-lab"
 # Derived from the deployment manifest so teardown --clean-images always
 # targets the same tag the daemon is shipping.
-PERF_SENTINEL_IMAGE=$(awk '/^[[:space:]]*image:[[:space:]]*ghcr\.io\/robintra\/perf-sentinel:/ { print $2; exit }' \
+PERF_SENTINEL_IMAGE=$(awk '/^[[:space:]]*image:[[:space:]]*ghcr\.io\/institut-du-numerique-responsable\/perf-sentinel:/ { print $2; exit }' \
   "${REPO_ROOT}/manifests/perf-sentinel-daemon.yaml")
 PERF_SENTINEL_VERSION="${PERF_SENTINEL_IMAGE##*:}"
 CLEAN_IMAGES="false"
@@ -50,7 +50,7 @@ clean_images() {
   fi
   step "Removing perf-sentinel images from local docker"
   docker rmi "perf-sentinel:${PERF_SENTINEL_VERSION}" 2>/dev/null || true
-  docker rmi "ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}" 2>/dev/null || true
+  docker rmi "ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}" 2>/dev/null || true
   ok "images removed"
 }
 

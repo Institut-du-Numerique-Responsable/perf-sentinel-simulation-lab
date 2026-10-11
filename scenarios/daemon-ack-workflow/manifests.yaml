@@ -93,7 +93,7 @@ spec:
       # manual `kubectl apply -f` of this file, and it is a digest on purpose:
       # a version tag would read as authoritative one release later, and would
       # let the rewrite guard pass on a sed that matched nothing.
-      image: ghcr.io/robintra/perf-sentinel@sha256:a68a1db1b5fca61772375c6919e336195d940c417b02e549888c25bf80446a59  # placeholder, verify.sh rewrites it to the image under validation
+      image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:a68a1db1b5fca61772375c6919e336195d940c417b02e549888c25bf80446a59  # placeholder, verify.sh rewrites it to the image under validation
       imagePullPolicy: IfNotPresent
       args:
         - watch

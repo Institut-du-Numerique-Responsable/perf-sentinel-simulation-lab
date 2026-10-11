@@ -72,7 +72,7 @@ src = open(path).read()
 out, n = re.subn(
     # Either the committed published digest pin or a local pin left by a
     # previous run.
-    r"image: (?:ghcr\.io/robintra/)?perf-sentinel-hub[:@][0-9A-Za-z._:-]+(\s*#.*)?",
+    r"image: (?:ghcr\.io/institut-du-numerique-responsable/)?perf-sentinel-hub[:@][0-9A-Za-z._:-]+(\s*#.*)?",
     f"image: {tag}  # local build, overrides the committed published pin",
     src,
 )

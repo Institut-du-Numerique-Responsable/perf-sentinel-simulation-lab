@@ -424,7 +424,7 @@ kubectl -n "${TOML_NS}" delete pod perf-sentinel-ack-toml --ignore-not-found >/d
 # Rendered to a file rather than piped, so the rewrite can be asserted. A sed
 # that matches nothing would silently run the digest frozen in manifests.yaml,
 # which is the failure scripts/resolve-image.sh exists to prevent.
-sed -e "s#image: ghcr.io/robintra/perf-sentinel@sha256:[0-9a-f]*.*#image: ${IMAGE}#" "${TOML_MANIFESTS}" \
+sed -e "s#image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:[0-9a-f]*.*#image: ${IMAGE}#" "${TOML_MANIFESTS}" \
   > "${TMP_DIR}/ack-toml.rendered.yaml"
 grep -qF "image: ${IMAGE}" "${TMP_DIR}/ack-toml.rendered.yaml" \
   || die "the image rewrite matched nothing, the pod would run the digest frozen in manifests.yaml"

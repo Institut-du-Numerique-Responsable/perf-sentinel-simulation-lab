@@ -351,7 +351,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: perf-sentinel
-          image: ghcr.io/robintra/perf-sentinel@sha256:93746187ccf5c08af4da0ce03513c2e048dc2244584ffd5e117e148595a974bb  # 0.26.0
+          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:93746187ccf5c08af4da0ce03513c2e048dc2244584ffd5e117e148595a974bb  # 0.26.0
           imagePullPolicy: IfNotPresent
           args:
             - watch

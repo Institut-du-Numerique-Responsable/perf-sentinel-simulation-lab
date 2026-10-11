@@ -154,7 +154,7 @@ nothing about the persisted archive having been read.
 | `CHART_VERSION`        | resolved                                          | pin a chart version and skip registry resolution                            |
 | `DAEMON_IMAGE`         | what the chart selects                            | `repo:tag` override, required for a release-candidate run                   |
 | `PERF_SENTINEL_CHART`  | `${PERF_SENTINEL_REPO_PATH}/charts/perf-sentinel` | local chart path, used in `local` mode                                      |
-| `OCI_CHART`            | `oci://ghcr.io/robintra/charts/perf-sentinel`     | published chart reference                                                   |
+| `OCI_CHART`            | `oci://ghcr.io/institut-du-numerique-responsable/charts/perf-sentinel`     | published chart reference                                                   |
 | `LOCAL_PORT`           | `14418`                                           | host port for this scenario's port-forward (the shared daemon uses `14318`) |
 | `ARCHIVE_WAIT_TIMEOUT` | `90`                                              | wall-clock seconds to wait for the trace to leave the window                |
 | `PVC_UTIL_IMAGE`       | `busybox:1.37`                                    | archive reader pod image                                                    |
@@ -218,7 +218,7 @@ watch for. Install the same chart with persistence off and both load-bearing
 assertions go red, which is the 0.2.57 shape:
 
 ```bash
-helm install cdpx oci://ghcr.io/robintra/charts/perf-sentinel --version <v> \
+helm install cdpx oci://ghcr.io/institut-du-numerique-responsable/charts/perf-sentinel --version <v> \
   -n <scratch-ns> --set fullnameOverride=cdpx \
   --set workload.kind=StatefulSet \
   --set workload.statefulset.persistence.enabled=false --wait

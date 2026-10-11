@@ -9,7 +9,7 @@
 # the artifact a user actually installs. Overridable so a pre-release validation
 # can point at a locally built image instead of the last published one — the
 # default must stay a real published tag, or a fresh clone builds nothing.
-ARG PERF_SENTINEL_IMAGE=ghcr.io/robintra/perf-sentinel:0.11.2
+ARG PERF_SENTINEL_IMAGE=ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.11.2
 FROM ${PERF_SENTINEL_IMAGE} AS perf-sentinel
 
 # Latest LTS line as of 2026-08-01 (2.575 is the weekly, not the LTS), arm64-native.

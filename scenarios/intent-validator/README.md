@@ -6,7 +6,7 @@ required-field validation.
 
 ## What it covers
 
-4 sub-tests run inside `ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION}`
+4 sub-tests run inside `ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION}`
 (defaults to the lab's currently-pinned version):
 
 1. **Internal G1 happy path** (exit 0).

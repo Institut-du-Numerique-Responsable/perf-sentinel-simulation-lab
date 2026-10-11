@@ -19,7 +19,7 @@ PERF_SENTINEL_VERSION=0.8.2 make verify-disclose   # pin an older binary on purp
 ```
 
 Hermetic CLI scenario (no cluster/daemon): `docker run
-ghcr.io/robintra/perf-sentinel:${PERF_SENTINEL_VERSION:-0.8.2} disclose` over the
+ghcr.io/institut-du-numerique-responsable/perf-sentinel:${PERF_SENTINEL_VERSION:-0.8.2} disclose` over the
 committed fixtures.
 
 ## Sub-tests

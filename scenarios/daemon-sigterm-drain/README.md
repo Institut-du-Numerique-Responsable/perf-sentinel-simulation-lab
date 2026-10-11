@@ -107,7 +107,7 @@ Run the same scenario against a 0.8.4 image and the **positive control must fail
 (0.8.4 does not drain on `SIGTERM`, so `probe_positive` is never archived):
 
 ```
-SIGTERM_DRAIN_IMAGE=ghcr.io/robintra/perf-sentinel@sha256:<0.8.4-digest> \
+SIGTERM_DRAIN_IMAGE=ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:<0.8.4-digest> \
   ./scenarios/daemon-sigterm-drain/verify.sh   # -> FAIL on the positive control
 ```
 

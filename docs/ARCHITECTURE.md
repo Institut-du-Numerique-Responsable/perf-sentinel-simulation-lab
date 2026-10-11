@@ -159,7 +159,7 @@ produce findings.
 
 ### perf-sentinel daemon
 
-Image `ghcr.io/robintra/perf-sentinel:0.5.16`. The upstream image is
+Image `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.16`. The upstream image is
 `FROM scratch`, which means:
 
 - No `kubectl exec` (no shell).

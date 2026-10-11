@@ -73,7 +73,7 @@
     },
     {
       "description": "perf-sentinel and its Hub are the product under test, pinned by hand at each release; never propose updates for them",
-      "matchPackageNames": ["ghcr.io/robintra/perf-sentinel", "ghcr.io/robintra/perf-sentinel-hub"],
+      "matchPackageNames": ["ghcr.io/institut-du-numerique-responsable/perf-sentinel", "ghcr.io/institut-du-numerique-responsable/perf-sentinel-hub"],
       "enabled": false
     },
     {

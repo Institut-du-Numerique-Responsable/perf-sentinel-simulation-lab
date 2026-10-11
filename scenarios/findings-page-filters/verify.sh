@@ -58,7 +58,7 @@ PERF_SENTINEL_LOCAL_BIN="${PERF_SENTINEL_LOCAL_BIN:-${PERF_SENTINEL_REPO_PATH}/t
 
 # The last published release, the A side of every comparison. Bump it with
 # the pin in manifests/perf-sentinel-daemon.yaml.
-BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/robintra/perf-sentinel:0.20.2}"
+BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2}"
 BASELINE_NAME="fpf-baseline-$$"
 
 DAEMON_HTTP_PORT="${FPF_DAEMON_HTTP_PORT:-14828}"

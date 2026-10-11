@@ -46,7 +46,7 @@ with synthetic data.
 reference, for a locally built pre-release), then `PERF_SENTINEL_VERSION` (a
 GHCR tag), then the pin in `manifests/perf-sentinel-daemon.yaml`.
 
-It used to be hardcoded to `ghcr.io/robintra/perf-sentinel:0.5.21`, so the
+It used to be hardcoded to `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.5.21`, so the
 scenario ran green on every release without ever touching the version under
 validation. The gate reported a PASS for code it had not executed.
 

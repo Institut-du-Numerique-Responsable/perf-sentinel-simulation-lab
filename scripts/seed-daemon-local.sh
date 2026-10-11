@@ -53,7 +53,7 @@ src = open(path).read()
 out, n = re.subn(
     # Either the committed GHCR digest pin, or a local pin left by a previous
     # run: re-pinning to a second revision is the whole point of an A/B.
-    r"image: (?:ghcr\.io/robintra/perf-sentinel@sha256:[0-9a-f]+"
+    r"image: (?:ghcr\.io/institut-du-numerique-responsable/perf-sentinel@sha256:[0-9a-f]+"
     r"|perf-sentinel:[0-9A-Za-z._-]+)(\s*#.*)?",
     f"image: {tag}  # local pre-release build, replace with the GHCR digest at release",
     src,

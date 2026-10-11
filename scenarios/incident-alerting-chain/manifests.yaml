@@ -130,7 +130,7 @@ spec:
           # uncommitted local pin during a pre-release pass, and deriving the
           # twin from it would turn this A/B into an A/A that asserts the
           # opposite of the truth while staying green.
-          image: ghcr.io/robintra/perf-sentinel@sha256:548352300575e73e38adfb80f9b2c3f3974442108a2a34b2a360a2275adef4fa
+          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:548352300575e73e38adfb80f9b2c3f3974442108a2a34b2a360a2275adef4fa
           imagePullPolicy: IfNotPresent
           args: ["watch", "--config", "/etc/perf-sentinel/config.toml"]
           ports:
