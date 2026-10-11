@@ -57,7 +57,7 @@ Report at `/tmp/scenario-template-jenkinsfile-report.md`.
   Jenkins WAR on first run. The scenario tolerates this and reports
   SKIPPED with a clear note. Structural lint remains the hard gate.
 - The upstream Jenkinsfile downloads the perf-sentinel binary from
-  `github.com/robintra/perf-sentinel/releases/v${PERF_SENTINEL_VERSION}/`.
+  `github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/v${PERF_SENTINEL_VERSION}/`.
   Real users in CI will hit this URL. The lab does not pre-fetch it.
 - `--platform linux/amd64` is forced for ARM hosts (M-series Mac).
 - `timeout` is GNU-only. The script falls back to `gtimeout` (brew

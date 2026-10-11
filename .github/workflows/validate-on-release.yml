@@ -729,7 +729,7 @@ jobs:
               ``,
               `**Trigger**: ${trigger}`,
               `**Run**: ${runUrl}`,
-              `**Tag perf-sentinel**: https://github.com/robintra/perf-sentinel/releases/tag/v${version}`,
+              `**Tag perf-sentinel**: https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/tag/v${version}`,
               ``,
               `If the failed step is **make validate (offline)**, this is lab-side drift, not an upstream regression: it runs before \`make up-cni\` and never contacts perf-sentinel.`,
               ``,

@@ -26,19 +26,19 @@ dev, CI, staging and production.
 
 **Local dev**
 
-![Local dev zoom-in: batch on captured trace, local daemon at 127.0.0.1, inspect TUI, report HTML](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-local-dev.svg)
+![Local dev zoom-in: batch on captured trace, local daemon at 127.0.0.1, inspect TUI, report HTML](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-local-dev.svg)
 
 **CI/CD**
 
-![CI zoom-in: perf integration tests + analyze --ci quality gate, SARIF for code scanning, optional Tempo / jaeger-query nightly](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-CI.svg)
+![CI zoom-in: perf integration tests + analyze --ci quality gate, SARIF for code scanning, optional Tempo / jaeger-query nightly](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-CI.svg)
 
 **Staging**
 
-![Staging zoom-in: focus-service pod with sidecar daemon, /api/findings polled by QA / SRE](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-staging.svg)
+![Staging zoom-in: focus-service pod with sidecar daemon, /api/findings polled by QA / SRE](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-staging.svg)
 
 **Production**
 
-![Production zoom-in: centralized daemon ingesting via OTel Collector and direct OTLP, /api/* + /metrics + NDJSON](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-production.svg)
+![Production zoom-in: centralized daemon ingesting via OTel Collector and direct OTLP, /api/* + /metrics + NDJSON](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-production.svg)
 
 ### GreenOps view
 
@@ -50,7 +50,7 @@ carbon per request via Boavizta + HotCarbon 2024 for gCO2e, network
 transport via Mytton 2024 for kWh/GB). Works in both batch and daemon
 mode, with linear, hourly, and monthly + hourly resolution.
 
-![GreenOps integration: external real-time sources (Scaphandre kWh, Electricity Maps gCO2/kWh) plus internal cold sources (Cloud SPECpower kWh, embodied carbon gCO2e/req via Boavizta + HotCarbon 2024, network transport kWh/GB via Mytton 2024) feeding perf-sentinel in batch or daemon mode, emitting energy and carbon alongside traces](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-GreenOps.svg)
+![GreenOps integration: external real-time sources (Scaphandre kWh, Electricity Maps gCO2/kWh) plus internal cold sources (Cloud SPECpower kWh, embodied carbon gCO2e/req via Boavizta + HotCarbon 2024, network transport kWh/GB via Mytton 2024) feeding perf-sentinel in batch or daemon mode, emitting energy and carbon alongside traces](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/perf-sentinel-GreenOps.svg)
 
 ### End-to-end view: how the four environments fit together
 
@@ -58,9 +58,9 @@ Once each mode is clear on its own, this is the integration view that
 puts all four side by side and traces a code change from the developer's
 laptop all the way to the production daemon's findings.
 
-![Global perf-sentinel integration across local dev, CI, staging and prod](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/global-integration.svg)
+![Global perf-sentinel integration across local dev, CI, staging and prod](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/global-integration.svg)
 
-Source: [`global-integration.mmd`](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/mmd/global-integration.mmd).
+Source: [`global-integration.mmd`](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/mmd/global-integration.mmd).
 Single SVG rendered from the `.mmd` source, committed alongside so the
 guide displays inline on GitHub. Colors and contrast are baked into
 the `.mmd` so the diagram stays readable in both light and dark mode.
@@ -89,7 +89,7 @@ production daemon's findings.
 | (14)    | All other services flow through the OTel Collector, which forwards OTLP to both the centralized daemon and the trace store (Tempo / VictoriaTraces / Jaeger).                                                                                                                                                                                                                                                                                                                                                                                                                                              | centralized               |
 | (15)    | On-call polls the daemon's HTTP API (`/api/status`, `/api/findings`, `/api/correlations`, `/api/explain/<trace-id>`, `/api/export/report`) and snapshots the Report to a self-contained HTML for post-mortem.                                                                                                                                                                                                                                                                                                                                                                                              | centralized               |
 | (16)    | Optional nightly CI cron pulls recent traces from the trace store via `perf-sentinel tempo` (Tempo OTLP-JSON) or `perf-sentinel jaeger-query` (Jaeger / VictoriaTraces) to run regression detection on prod traffic.                                                                                                                                                                                                                                                                                                                                                                                       | CI batch                  |
-| (extra) | **Always-on metrics path**: Prometheus scrapes the daemon's `/metrics` endpoint (works for any daemon, sidecar or centralized, on the same port as OTLP HTTP) and Grafana renders it via the upstream dashboard at [`examples/grafana-dashboard.json`](https://github.com/robintra/perf-sentinel/blob/main/examples/grafana-dashboard.json) using `perf_sentinel_findings_total`, `perf_sentinel_io_waste_ratio`, `perf_sentinel_service_io_ops_total`.                                                                                                                                                          | centralized + sidecar     |
+| (extra) | **Always-on metrics path**: Prometheus scrapes the daemon's `/metrics` endpoint (works for any daemon, sidecar or centralized, on the same port as OTLP HTTP) and Grafana renders it via the upstream dashboard at [`examples/grafana-dashboard.json`](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/blob/main/examples/grafana-dashboard.json) using `perf_sentinel_findings_total`, `perf_sentinel_io_waste_ratio`, `perf_sentinel_service_io_ops_total`.                                                                                                                                                          | centralized + sidecar     |
 | (extra) | **Always-on log path**: every daemon also streams findings as NDJSON to stdout, picked up by the log aggregator (Loki / Elasticsearch / Splunk) via `kubectl logs` or fluent-bit. Useful for alerting and grep-style triage when the HTTP API is overkill.                                                                                                                                                                                                                                                                                                                                                 | centralized + sidecar     |
 | (A)     | **pg_stat ingestion via CSV file**: a scheduled or on-demand `psql \copy (SELECT ... FROM pg_stat_statements) TO STDOUT WITH CSV HEADER` exports a snapshot of SQL hotspot counters to `pg-stat.csv`. The file is fed to `analyze`, `report` or the standalone `pg-stat` subcommand via `--pg-stat <csv>`. Works in both CI and local dev.                                                                                                                                                                                                                                                                 | CI batch + local batch    |
 | (B)     | **pg_stat ingestion via Prometheus**: `postgres_exporter` exposes `pg_stat_statements` on `:9187/metrics`, scraped by the cluster Prometheus. perf-sentinel reaches it via `--pg-stat-prometheus <url>` (one-shot HTTP GET against either `postgres_exporter` directly or the Prometheus aggregating it). Mutually exclusive with `--pg-stat <csv>`. Auth via `--pg-stat-auth-header` (`PERF_SENTINEL_PGSTAT_AUTH_HEADER` env var preferred in production).                                                                                                                                                | CI batch + local batch    |
@@ -447,7 +447,7 @@ Every scenario diagram uses a consistent vocabulary:
   CSV`).
 
 The diagrams are also available as standalone Mermaid sources under
-[`docs/diagrams/mmd/`](https://github.com/robintra/perf-sentinel-simulation-lab/tree/main/docs/diagrams/mmd)
+[`docs/diagrams/mmd/`](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/tree/main/docs/diagrams/mmd)
 (`<name>.mmd`), useful for rendering to SVG/PNG or copying into other
 docs.
 
@@ -1902,7 +1902,7 @@ Two scenarios accept stress profiles tuned for the developer machine:
 The lab repo (this file) is the canonical reference because every
 diagram is anchored to a runnable verify script. When promoting parts
 of this guide into the upstream perf-sentinel docs (under
-`https://github.com/robintra/perf-sentinel`), favour:
+`https://github.com/Institut-du-Numerique-Responsable/perf-sentinel`), favour:
 
 - The capture format cheat sheet.
 - The per-mode configuration blocks.

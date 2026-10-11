@@ -541,7 +541,7 @@ fi
 #     legacy sha256-<digest>.sig tag, so cosign 2.x reports "no signatures
 #     found" and only 3.x verifies it. That is reported as a distinct verdict
 #     rather than a flat failure, since the artifact is signed either way.
-COSIGN_IDENTITY_RE='^https://github[.]com/robintra/perf-sentinel/[.]github/workflows/helm-release[.]yml@refs/tags/chart-v'
+COSIGN_IDENTITY_RE='^https://github[.]com/(robintra|Institut-du-Numerique-Responsable)/perf-sentinel/[.]github/workflows/helm-release[.]yml@refs/tags/chart-v'
 COSIGN_VER="$(cosign version 2>/dev/null | awk '/GitVersion/{print $2}')"
 COSIGN_MAJOR="$(printf '%s' "${COSIGN_VER}" | sed -n 's/^v\{0,1\}\([0-9]\{1,\}\)\..*/\1/p')"
 if [ "${RESOLVED_SOURCE}" != "oci" ]; then

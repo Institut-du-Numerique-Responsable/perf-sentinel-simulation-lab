@@ -23,14 +23,14 @@ services that reproduce the same anti-patterns across the JVM
 (Quarkus, Quarkus + Mutiny, Helidon MP, Helidon SE, Kotlin + Ktor), .NET, Go, NestJS,
 Django, FastAPI, PHP (Laravel, Symfony), Ruby on Rails, and Rust
 (Diesel, SeaORM). See
-[docs/MULTISTACK.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md).
+[docs/MULTISTACK.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md).
 
 `make seed-services && make validate-findings` runs the twelve k6
 scenarios on the core Java services and reports how many anti-patterns
 perf-sentinel detected on the expected service. `make verify-all-scenarios`
 runs the full suite of deployment, CI, resilience, measured-energy,
 and disclosure scenarios, documented in
-[docs/SCENARIOS.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md).
+[docs/SCENARIOS.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md).
 
 ## Prerequisites
 
@@ -79,7 +79,7 @@ High-level view:
        └──> Grafana datasources: Prometheus + Tempo
 ```
 
-Full details and rationale: [docs/ARCHITECTURE.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/ARCHITECTURE.md).
+Full details and rationale: [docs/ARCHITECTURE.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/ARCHITECTURE.md).
 
 ## What you get
 
@@ -216,7 +216,7 @@ temporal_granularity = "5_minutes"
 ```
 
 The full ConfigMap with inline comments lives in
-[`manifests/perf-sentinel-daemon.yaml`](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/manifests/perf-sentinel-daemon.yaml).
+[`manifests/perf-sentinel-daemon.yaml`](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/manifests/perf-sentinel-daemon.yaml).
 Ports 14317/14318 (instead of the defaults 4317/4318) avoid confusion
 with the standard OTLP ports used by Tempo and the OTel Collector.
 
@@ -242,7 +242,7 @@ in-cluster and asserts that each scenario produces at least one
 matching finding on the expected service. The fifteen multistack
 services reproduce the same twelve patterns in other language stacks.
 Drive one with `scripts/run-multistack-scenario.sh <stack>`, and see
-[docs/MULTISTACK.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md).
+[docs/MULTISTACK.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md).
 
 ## GreenOps integration
 
@@ -262,7 +262,7 @@ continuity (schema v1.2). The `disclose` and `disclose-temporal`
 scenarios lock those contracts.
 
 Setup, sandbox vs trial differences, configuration knobs, and visual
-proof: [docs/GREENOPS.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/GREENOPS.md).
+proof: [docs/GREENOPS.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/GREENOPS.md).
 
 ## Status
 
@@ -274,28 +274,28 @@ All planned milestones have shipped:
   endpoints, 12 k6 scenarios, and the validate-findings pipeline.
 - A multistack expansion: 15 more services across the JVM (including
   Kotlin + Ktor), .NET, Go, NestJS, Django, FastAPI, PHP, Ruby, and Rust
-  ([docs/MULTISTACK.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md)).
+  ([docs/MULTISTACK.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/MULTISTACK.md)).
 - Measured-energy backends (Scaphandre, Kepler, Redfish) and GreenOps
   carbon scoring
-  ([docs/GREENOPS.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/GREENOPS.md)).
+  ([docs/GREENOPS.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/GREENOPS.md)).
 - GitLab CE for the GitLab CI template
-  ([docs/GITLAB-CI.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/GITLAB-CI.md)),
+  ([docs/GITLAB-CI.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/GITLAB-CI.md)),
   plus Jenkins and GitHub Actions template scenarios.
 - A release gate: the lab is the pre-tag validation for perf-sentinel,
   each PASS recorded in the upstream `release-gate/lab-validations.txt`
   ledger
-  ([docs/RELEASE-GATE.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/RELEASE-GATE.md)).
+  ([docs/RELEASE-GATE.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/RELEASE-GATE.md)).
 
 ## Troubleshooting
 
 Common errors (port already bound, GHCR pull failure, OOM, blank
-dashboard, etc.) and fixes: [docs/TROUBLESHOOTING.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/TROUBLESHOOTING.md).
+dashboard, etc.) and fixes: [docs/TROUBLESHOOTING.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/TROUBLESHOOTING.md).
 
 ## Resources
 
 RAM/CPU estimate per component:
-[docs/RESOURCES.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/RESOURCES.md).
+[docs/RESOURCES.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/RESOURCES.md).
 
 ## License
 
-AGPL v3, aligned with perf-sentinel. See [LICENSE](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/LICENSE).
+AGPL v3, aligned with perf-sentinel. See [LICENSE](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/LICENSE).

@@ -35,7 +35,7 @@ spec:
           annotations:
             summary: "perf-sentinel daemon is down"
             description: "Daemon job is unscrapeable (down or gone) for at least 2 minutes."
-            runbook_url: "https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
+            runbook_url: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
 
         - alert: PerfSentinelHighIOWasteRatio
           expr: perf_sentinel_io_waste_ratio > 0.30
@@ -46,7 +46,7 @@ spec:
           annotations:
             summary: "I/O waste ratio above 30%"
             description: "io_waste_ratio is {{ $value | humanize }}, above the 30% threshold for 10 minutes. Investigate top finding types via /api/findings."
-            runbook_url: "https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
+            runbook_url: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
 
         - alert: PerfSentinelCriticalFindingsSurge
           # Threshold rationale: 5/h fires on every `make validate-findings`
@@ -72,7 +72,7 @@ spec:
           annotations:
             summary: "Surge of critical findings"
             description: "{{ $value }} critical findings in the last hour. Investigate via /api/findings or the upstream dashboard panel `Critical findings trend (24h)`."
-            runbook_url: "https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
+            runbook_url: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
 
         - alert: PerfSentinelActiveTracesNearCapacity
           expr: perf_sentinel_active_traces > 8000
@@ -83,7 +83,7 @@ spec:
           annotations:
             summary: "Active traces approaching max capacity (10000)"
             description: "active_traces is {{ $value }}. The LRU evicts at max_active_traces (default 10000), so finding accuracy may degrade. Lower max_active_traces or scale out."
-            runbook_url: "https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
+            runbook_url: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
 
         - alert: PerfSentinelEventProcessingStalled
           expr: rate(perf_sentinel_events_processed_total[5m]) == 0
@@ -94,4 +94,4 @@ spec:
           annotations:
             summary: "Daemon is not processing events"
             description: "No events processed in the last 5 minutes. Check the OTel Collector pipeline (otel-collector-egress NetworkPolicy, OTLP receiver) or service health."
-            runbook_url: "https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"
+            runbook_url: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md#grafana-dashboard-validation"

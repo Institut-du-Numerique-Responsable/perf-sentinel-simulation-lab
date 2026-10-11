@@ -9,7 +9,7 @@ scenario. The same diagrams are embedded as fenced code blocks in
   Mermaid plugin, mermaid.live).
 - Rendered to SVG/PNG offline for slide decks or external docs.
 - Promoted into the upstream
-  [perf-sentinel](https://github.com/robintra/perf-sentinel) docs
+  [perf-sentinel](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel) docs
   without carrying the lab's surrounding markdown.
 
 ## Layout
@@ -32,7 +32,7 @@ dark mode without needing a `<picture>` theme switcher.
 A guide embeds a diagram via a plain markdown image:
 
 ```markdown
-![Alt text](https://raw.githubusercontent.com/robintra/perf-sentinel-simulation-lab/main/docs/diagrams/svg/global-integration.svg)
+![Alt text](https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/main/docs/diagrams/svg/global-integration.svg)
 ```
 
 URLs are absolute (`raw.githubusercontent.com/...`) so the same

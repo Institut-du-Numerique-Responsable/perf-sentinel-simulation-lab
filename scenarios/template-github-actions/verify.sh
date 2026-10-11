@@ -30,7 +30,7 @@ SCENARIO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAB_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 
 UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.26.0}"
-UPSTREAM_URL="https://raw.githubusercontent.com/robintra/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/github-actions.yml"
+UPSTREAM_URL="https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/github-actions.yml"
 # rhysd/actionlint is a lightweight GHA workflow validator (no runtime,
 # no docker socket needed). nektos/act would require gh-pages, secrets,
 # and a working binary URL inside the runner container, which is more

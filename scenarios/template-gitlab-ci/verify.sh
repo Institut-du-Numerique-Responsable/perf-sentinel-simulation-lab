@@ -41,7 +41,7 @@ GITLAB_VERIFY="${LAB_ROOT}/scripts/verify-gitlab-perf-sentinel.sh"
 FIXTURE_PIN="$(grep -oE 'PERF_SENTINEL_VERSION:[[:space:]]*"[0-9.]+"' "${LAB_FIXTURE}" \
   | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)"
 UPSTREAM_VERSION="${UPSTREAM_VERSION:-${FIXTURE_PIN:-0.22.2}}"
-UPSTREAM_URL="https://raw.githubusercontent.com/robintra/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/gitlab-ci.yml"
+UPSTREAM_URL="https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/gitlab-ci.yml"
 GITLAB_URL="${GITLAB_URL:-http://localhost:8181}"
 PAT_FILE="${PAT_FILE:-/tmp/gitlab-pat.txt}"
 

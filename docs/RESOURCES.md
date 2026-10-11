@@ -6,7 +6,7 @@ laptop (24 GiB) with Docker Desktop allocated 8 GiB.
 
 ## Bootstrap path
 
-Since the CNI migration to Cilium (see [NETWORK-POLICIES.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/NETWORK-POLICIES.md)),
+Since the CNI migration to Cilium (see [NETWORK-POLICIES.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/NETWORK-POLICIES.md)),
 the default bootstrap target is `make up-cni`. The legacy `make up`
 redirects to it with a deprecation note. The reason: `cluster/k3d-config.yaml`
 disables Flannel and the k3s NetworkPolicy controller, so a plain
@@ -46,7 +46,7 @@ Beyond the nominal validation, the lab ships a deployment-scenarios
 suite that covers other perf-sentinel operational modes (hybrid daemon
 to batch HTML, batch over Tempo, calibrate, daemon OTLP direct,
 multi-format input, sidecar pattern, cross-trace correlation, pg_stat
-integration). See [SCENARIOS.md](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md) for the adoption guide
+integration). See [SCENARIOS.md](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/docs/SCENARIOS.md) for the adoption guide
 with architecture diagrams, configuration knobs, and per-scenario
 `make verify-<name>` targets. All eight scenarios pass.
 
@@ -65,7 +65,7 @@ step in the perf-sentinel release workflow:
   uses: peter-evans/repository-dispatch@v3
   with:
     token: ${{ secrets.LAB_DISPATCH_TOKEN }}
-    repository: robintra/perf-sentinel-simulation-lab
+    repository: Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab
     event-type: perf-sentinel-released
     client-payload: '{"version": "${{ github.event.release.tag_name }}"}'
 ```

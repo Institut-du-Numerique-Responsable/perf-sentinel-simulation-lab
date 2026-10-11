@@ -68,7 +68,7 @@ result into the same internal struct the CSV path uses, so both paths
 produce identical HTML dashboards.
 
 The lab deploys postgres-exporter via the
-[grafana-dashboard scenario](https://github.com/robintra/perf-sentinel-simulation-lab/blob/main/scenarios/grafana-dashboard/README.md).
+[grafana-dashboard scenario](https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab/blob/main/scenarios/grafana-dashboard/README.md).
 After running `make verify-grafana-dashboard` once, the `verify-pg-stat`
 script auto-detects postgres-exporter and exercises Path 2 in addition
 to Path 1.

@@ -58,7 +58,7 @@ Report at `/tmp/scenario-template-github-actions-report.md`.
   workflow. Real GHA-only behaviors (secrets resolution, gh-pages
   pushes, third-party Actions outcomes) are not exercised.
 - The template's binary install step downloads from
-  `github.com/robintra/perf-sentinel/releases/...`. Real workflow runs
+  `github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/...`. Real workflow runs
   in GHA depend on this URL being reachable and the release artefact
   being present. The lab does not validate the binary's actual
   download here.

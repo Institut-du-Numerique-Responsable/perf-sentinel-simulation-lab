@@ -50,7 +50,7 @@ perf-sentinel:
     - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates jq
     - |
       set -euo pipefail
-      BASE_URL="https://github.com/robintra/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
+      BASE_URL="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
       curl -sSLf -o perf-sentinel-linux-amd64 "${BASE_URL}/perf-sentinel-linux-amd64"
       curl -sSLf -o SHA256SUMS.txt            "${BASE_URL}/SHA256SUMS.txt"
       # Verify integrity before executing. Fails the job if the binary was
@@ -130,7 +130,7 @@ perf-sentinel-pages-simple:
     - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
     - |
       set -euo pipefail
-      BASE_URL="https://github.com/robintra/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
+      BASE_URL="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
       curl -sSLf -o perf-sentinel-linux-amd64 "${BASE_URL}/perf-sentinel-linux-amd64"
       curl -sSLf -o SHA256SUMS.txt            "${BASE_URL}/SHA256SUMS.txt"
       grep 'perf-sentinel-linux-amd64' SHA256SUMS.txt | sha256sum -c -

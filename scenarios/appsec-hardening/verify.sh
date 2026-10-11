@@ -300,7 +300,7 @@ jq -e '.verifications.content_hash.status=="ok" and .verifications.binary_attest
 # binary_attestation is a post-sign field: injecting it AFTER hash-bake must
 # leave the content hash valid while capping the overall verdict.
 jq '.integrity.binary_attestation = {format:"slsa-provenance-v1",
-      attestation_url:"https://github.com/robintra/perf-sentinel/releases/download/v0.9.15/perf-sentinel-linux-amd64.intoto.jsonl",
+      attestation_url:"https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v0.9.15/perf-sentinel-linux-amd64.intoto.jsonl",
       builder_id:"https://github.com/actions/runner",git_tag:"v0.9.15",
       git_commit:"0bffc037",slsa_level:"L2"}' \
   "${TMP_DIR}/baked.json" > "${TMP_DIR}/attested.json"
