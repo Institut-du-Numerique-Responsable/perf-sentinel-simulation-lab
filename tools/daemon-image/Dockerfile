@@ -3,7 +3,7 @@
 # be the perf-sentinel repository root (scripts/seed-daemon-local.sh).
 # Mirrors the release image: static musl binary, FROM scratch, same
 # allocator path (musl -> mimalloc) as the published binaries.
-FROM rust:1.98-alpine AS build
+FROM rust:1.99-alpine AS build
 RUN apk add --no-cache build-base musl-dev
 # Optional cap on rustc parallelism for a host short on memory, passed by
 # scripts/seed-daemon-local.sh from DAEMON_BUILD_JOBS. Unset means cargo's default.

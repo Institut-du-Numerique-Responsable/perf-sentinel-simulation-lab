@@ -1,6 +1,6 @@
 # seaorm-svc Dockerfile. SeaORM uses sqlx (pure Rust + rustls) —
 # no libpq C dependency, unlike diesel-svc. Lighter runtime.
-FROM rust:1.98-bookworm AS builder
+FROM rust:1.99-bookworm AS builder
 WORKDIR /build
 COPY Cargo.toml Cargo.lock* ./
 RUN mkdir src && echo 'fn main(){}' > src/main.rs && cargo build --release 2>/dev/null || true
