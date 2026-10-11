@@ -108,7 +108,7 @@ case "${CNI}" in
     helm repo update projectcalico >/dev/null
     helm upgrade --install calico projectcalico/tigera-operator \
       --namespace tigera-operator --create-namespace \
-      --version v3.32.2 \
+      --version v3.33.0 \
       --wait --timeout 5m
     step "Waiting for Calico nodes Ready"
     kubectl -n calico-system rollout status daemonset/calico-node --timeout=180s
