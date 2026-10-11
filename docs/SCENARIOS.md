@@ -1400,7 +1400,7 @@ make verify-output-formats-coverage  # depends on ci-shift-left having run
 ### template-gitlab-ci
 
 Validates the upstream `docs/ci-templates/gitlab-ci.yml` at the tag the
-lab fixture pins, 0.26.0 today:
+lab fixture pins, 0.26.2 today:
 
 1. Curl upstream template (fallback to local clone).
 2. Lint via GitLab CE CI Lint API (`POST /api/v4/ci/lint`).
