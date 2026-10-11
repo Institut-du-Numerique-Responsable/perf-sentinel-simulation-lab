@@ -18,9 +18,13 @@ contact:
 repository-code: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab"
 license: AGPL-3.0-only
 keywords:
+  - "perf-sentinel"
   - "kubernetes"
+  - "k3d"
   - "opentelemetry"
-  - "simulation"
-  - "validation"
-  - "greenops"
+  - "observability"
   - "performance"
+  - "greenops"
+  - "simulation"
+  - "release-validation"
+  - "testing"
