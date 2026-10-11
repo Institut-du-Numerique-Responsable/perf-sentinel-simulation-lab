@@ -1,0 +1,26 @@
+# Citation metadata, readable by people, search engines and AI assistants.
+# Citation File Format 1.2.0, https://citation-file-format.github.io
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Perf Sentinel simulation lab: release validation on a local Kubernetes cluster"
+abstract: "Local Kubernetes simulation lab that validates Perf Sentinel against simulated but realistic infrastructure before each release."
+authors:
+  - given-names: "Robin"
+    family-names: "Trassard"
+    alias: "robintra"
+    affiliation: "Institut du Numérique Responsable"
+contact:
+  - given-names: "Robin"
+    family-names: "Trassard"
+    alias: "robintra"
+    affiliation: "Institut du Numérique Responsable"
+repository-code: "https://github.com/Institut-du-Numerique-Responsable/perf-sentinel-simulation-lab"
+license: AGPL-3.0-only
+keywords:
+  - "kubernetes"
+  - "opentelemetry"
+  - "simulation"
+  - "validation"
+  - "greenops"
+  - "performance"
