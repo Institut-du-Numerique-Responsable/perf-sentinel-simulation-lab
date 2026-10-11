@@ -13,7 +13,7 @@ ARG PERF_SENTINEL_IMAGE=ghcr.io/institut-du-numerique-responsable/perf-sentinel:
 FROM ${PERF_SENTINEL_IMAGE} AS perf-sentinel
 
 # Latest LTS line as of 2026-08-01 (2.575 is the weekly, not the LTS), arm64-native.
-FROM jenkins/jenkins:2.568.3-lts-jdk25
+FROM jenkins/jenkins:2.580.1-lts-jdk25
 
 USER root
 RUN apt-get update \
