@@ -6,7 +6,7 @@ self-contained (local release binary only, no cluster, no docker).
 
 ## What it checks
 
-| leg | behaviour checked (A-E new in 0.9.15, F newer than 0.26.2) | previous release (A-E: 0.9.14, F: 0.26.2) |
+| leg | behaviour checked (A-E new in 0.9.15, F new in 0.27.0) | previous release (A-E: 0.9.14, F: 0.26.2) |
 |---|---|---|
 | A | `analyze` strips query string, fragment and userinfo from `source_endpoint` (and the ack signature) when the endpoint comes from a raw URL; `@` inside a path and route templates survive | leaks `user:pass@shop-svc/api/orders?token=SECRET#frag` verbatim into endpoint + signature |
 | B | `GET /api/acks` returns 401 without `X-API-Key` when a key is configured, `PERF_SENTINEL_ACK_API_KEY` overrides the TOML key (both go through the same >=12-char validation). `[daemon] read_api_key` (0.20.0) answers 200 on `GET /api/acks` and 401 on `POST /api/findings/{sig}/ack` | GET served without any key (writes already gated), no read key |
@@ -29,11 +29,10 @@ flag, which are 0.9.15-only.
 ## Prerequisites
 
 - Local release binary at `$PERF_SENTINEL_REPO_PATH/target/release/perf-sentinel`
-  newer than 0.26.2 (`cargo build --release -p perf-sentinel`). Leg B needs
+  at 0.27.0 or later (`cargo build --release -p perf-sentinel`). Leg B needs
   the `[daemon] read_api_key` gate (0.20.0), leg F needs
-  `[daemon] require_read_key` and `query --api-key-file`, so any released
-  binary up to 0.26.2 fails leg F. A build of main after the 0.26.2 release
-  still prints `0.26.2` until the next tag, and passes.
+  `[daemon] require_read_key` and `query --api-key-file` (0.27.0), so any
+  binary up to 0.26.2 fails leg F.
 - `jq`, `python3`. Ports 14406-14407 free on loopback (legs B, C and F). Leg E additionally
   binds 14408-14409 on **all interfaces** (`0.0.0.0`, that is the point of
   the advisory leg, so expect a firewall prompt on first run) and then on

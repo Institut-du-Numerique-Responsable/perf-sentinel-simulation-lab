@@ -274,7 +274,7 @@ on reads with the `PERF_SENTINEL_ACK_API_KEY` override, the real
 quality gate on `/api/export/report`, the verify-hash attestation
 PARTIAL cap, and the non-loopback bind advisory. Its leg F adds the
 `[daemon] require_read_key` read gate and the `perf-sentinel query
---api-key-file` key, and needs a binary newer than 0.26.2.
+--api-key-file` key, and needs perf-sentinel 0.27.0 or later.
 
 The `consumer-endpoint` gate locks the same rule on the daemon path.
 notification-service consumes the `perfsim.order-service` queue under
@@ -1404,7 +1404,7 @@ make verify-output-formats-coverage  # depends on ci-shift-left having run
 ### template-gitlab-ci
 
 Validates the upstream `docs/ci-templates/gitlab-ci.yml` at the tag the
-lab fixture pins, 0.26.2 today:
+lab fixture pins, 0.27.0 today:
 
 1. Curl upstream template (fallback to local clone).
 2. Lint via GitLab CE CI Lint API (`POST /api/v4/ci/lint`).
@@ -2410,8 +2410,8 @@ no cluster, Docker not required.
 
 `appsec-hardening` validates the 0.9.15 AppSec remediation end to end,
 self-contained (local release binary + throwaway loopback daemon, no
-cluster, no Docker). Six legs, and leg F needs a binary newer than
-0.26.2. **A** batch-analyzes a synthetic
+cluster, no Docker). Six legs, and leg F needs perf-sentinel 0.27.0
+or later. **A** batch-analyzes a synthetic
 native fixture whose N+1 parent URL carries `user:pass@`,
 `?token=SECRET` and `#frag`. The finding's `source_endpoint` and
 signature must come back stripped, while a path-`@`
@@ -3036,7 +3036,7 @@ findings page.
   acked row.
 - **D, the fold is unchanged.** The same corpus into a daemon on the
   latest release (`FOLD_BASELINE_IMAGE`, the digest
-  `manifests/perf-sentinel-daemon.yaml` pins, 0.26.2 today) and one on
+  `manifests/perf-sentinel-daemon.yaml` pins, 0.27.0 today) and one on
   the build under test returns the same rows in the same order, with
   the same representative and the same counts. `stored_at_ms` and
   `first_seen_ms` are excluded, they date the reception; everything the

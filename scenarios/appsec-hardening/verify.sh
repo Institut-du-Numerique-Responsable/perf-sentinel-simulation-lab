@@ -25,10 +25,9 @@
 #      allowed_origins = ["*"], and `perf-sentinel query --api-key-file`
 #      carries the key (PERF_SENTINEL_DAEMON_API_KEY wins over the file).
 #
-# Self-contained: needs only the local release binary. Leg F needs a binary
-# newer than the 0.26.2 release (require_read_key, `query --api-key-file`):
-# the released 0.26.2 and older fail it by design. A build of perf-sentinel
-# main after 0.26.2 still prints 0.26.2 until the next tag, and passes.
+# Self-contained: needs only the local release binary. Leg F needs
+# perf-sentinel 0.27.0 or later (require_read_key, `query --api-key-file`):
+# 0.26.2 and older fail it by design.
 set -euo pipefail
 
 SCENARIO="appsec-hardening"

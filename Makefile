@@ -695,7 +695,7 @@ verify-alumet-conformance: ## 0.9.12 green: Alumet 6th measured backend vs the r
 verify-alumet-db-waste: ## 0.9.13 green: Alumet DB-cgroup energy x SQL waste ratio (database_waste arithmetic + exclusion + disclose absence, sticky/staleness, carry-over under shedding, config validation, monitor line; local binary, no cluster)
 	./scenarios/alumet-db-waste/verify.sh
 
-verify-appsec-hardening: ## 0.9.15 AppSec: source_endpoint redaction, ack API key + env override, real export quality gate, verify-hash attestation PARTIAL cap, non-loopback bind advisory, require_read_key gate + query --api-key-file (local binary > 0.26.2, no cluster)
+verify-appsec-hardening: ## 0.9.15 AppSec: source_endpoint redaction, ack API key + env override, real export quality gate, verify-hash attestation PARTIAL cap, non-loopback bind advisory, require_read_key gate + query --api-key-file (local binary >= 0.27.0, no cluster)
 	./scenarios/appsec-hardening/verify.sh
 
 verify-endpoint-resolution: ## 0.9.22 source.endpoint: ancestor walk to the inbound route, CLIENT skip, outermost code frame, one spelling per origin (local binary, no cluster)
