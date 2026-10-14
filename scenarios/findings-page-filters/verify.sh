@@ -9,11 +9,12 @@
 # `severity`, `limit`, `since_ms`, `until_ms` and `include_acked`, and no
 # scenario ever compared what the fold returns against a published release.
 #
-# Five claims. Three of them are A/B runs against the last published image,
-# because that is the only way to tell a real change from a lab that cannot
-# see one: the 0.20.2 ledger entry records a release whose behaviour no
-# scenario here could distinguish, and a leg that passes on both builds
-# proves nothing about the new one.
+# Five claims. Four of them carry a counter-proof against a before-the-feature
+# baseline (0.20.2), because that is the only way to tell a real change from a
+# lab that cannot see one: the 0.20.2 ledger entry records a release whose
+# behaviour no scenario here could distinguish, and a leg that passes on both
+# builds proves nothing about the new one. The fifth, D, is a comparison
+# against the latest release instead, see below.
 #
 #   A. Grouping. `?grouping=<value>` partitions the listing exactly, on the
 #      value `label_values(perf_sentinel_findings_total, grouping)` offers,
@@ -27,13 +28,18 @@
 #      past the end it is an empty 200, and, the trap written nowhere else, a
 #      page shortened by the ack screen is not the last page: the screen runs
 #      after `offset` and `limit`.
-#   D. The fold is unchanged. Same corpus into both daemons, same rows, same
-#      representative, same counts, batch by batch. `perf(daemon)` promised a
-#      cheaper fold, not a different one, and only this comparison holds it
-#      to that. Batch by batch and not row by row: one analysis batch shares
-#      one `stored_at_ms`, the listing is ordered on that stamp, and the
-#      order inside a batch is the insertion order, which moves between two
-#      runs of the SAME binary. The first full pass caught exactly that.
+#   D. The fold is unchanged. Same corpus into the daemon under test and one
+#      on the latest release, same rows, same representative, same counts,
+#      batch by batch. `perf(daemon)` promised a cheaper fold, not a different
+#      one, and only this comparison holds it to that. Not against 0.20.2:
+#      0.26.2 deliberately changed which instance represents a tie (smallest
+#      trace id for a slow trace, one finding order per input), so every
+#      build from 0.26.2 on differs from 0.20.2 on representatives without a
+#      fold regression. Batch by batch and not row by row: one analysis
+#      batch shares one `stored_at_ms`, the listing is ordered on that
+#      stamp, and the order inside a batch is the insertion order, which
+#      moves between two runs of the SAME binary. The first full pass caught
+#      exactly that.
 #   E. `serialized_calls` names the block instead of carrying it: at most
 #      three distinct templates, each cut at 120 characters, ` -> ...` when
 #      more follows, and the count, total and parallel estimate untouched.
@@ -41,8 +47,8 @@
 #
 # Self-contained: local release binary, Docker, python3, curl. No cluster.
 # Docker is a hard prerequisite here, unlike in the local-binary scenarios:
-# three of the five legs are comparisons and a scenario that quietly skips
-# them reads exactly like one that passed.
+# every leg compares against one of two published images and a scenario
+# that quietly skips them reads exactly like one that passed.
 set -uo pipefail
 
 SCENARIO="findings-page-filters"
@@ -56,16 +62,22 @@ TMP_DIR="/tmp/${SCENARIO}"
 PERF_SENTINEL_REPO_PATH="${PERF_SENTINEL_REPO_PATH:-${HOME}/RustroverProjects/perf-sentinel}"
 PERF_SENTINEL_LOCAL_BIN="${PERF_SENTINEL_LOCAL_BIN:-${PERF_SENTINEL_REPO_PATH}/target/release/perf-sentinel}"
 
-# The last published release, the A side of every comparison. Bump it with
-# the pin in manifests/perf-sentinel-daemon.yaml.
+# The before-the-feature release, the counter-proof of legs A, B, C and E.
+# Fixed on purpose: those legs need a build without 0.21.0's parameters.
 BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2}"
 BASELINE_NAME="fpf-baseline-$$"
+# The latest release, the reference of leg D. Bump it with the pin in
+# manifests/perf-sentinel-daemon.yaml, same digest.
+FOLD_BASELINE_IMAGE="${FOLD_BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:908c9b31d24a21e579b3723bcae17c046628d762b626f5d897c45530fbe9343c}"  # 0.26.2
+FOLD_BASELINE_NAME="fpf-fold-baseline-$$"
 
 DAEMON_HTTP_PORT="${FPF_DAEMON_HTTP_PORT:-14828}"
 DAEMON_GRPC_PORT="${FPF_DAEMON_GRPC_PORT:-14827}"
 BASELINE_HTTP_PORT="${FPF_BASELINE_HTTP_PORT:-14838}"
+FOLD_BASELINE_HTTP_PORT="${FPF_FOLD_BASELINE_HTTP_PORT:-14839}"
 DAEMON_URL="http://127.0.0.1:${DAEMON_HTTP_PORT}"
 BASELINE_URL="http://127.0.0.1:${BASELINE_HTTP_PORT}"
+FOLD_BASELINE_URL="http://127.0.0.1:${FOLD_BASELINE_HTTP_PORT}"
 
 # Two tenants, so leg A has something to partition. One would make the
 # baseline's "ignores the parameter" answer and the correct one identical.
@@ -106,7 +118,7 @@ fail() { color_red "    FAIL: $2"; RESULTS+=("$1|FAIL|$2"); FAILURES=$((FAILURES
 DAEMON_PID=""
 cleanup() {
   [ -n "${DAEMON_PID}" ] && kill "${DAEMON_PID}" 2>/dev/null
-  docker rm -f "${BASELINE_NAME}" >/dev/null 2>&1
+  docker rm -f "${BASELINE_NAME}" "${FOLD_BASELINE_NAME}" >/dev/null 2>&1
   return 0
 }
 trap cleanup EXIT
@@ -117,18 +129,21 @@ step "Prerequisites"
 [ -x "${PERF_SENTINEL_LOCAL_BIN}" ] \
   || die "no release binary at ${PERF_SENTINEL_LOCAL_BIN}, run: cd ${PERF_SENTINEL_REPO_PATH} && cargo build --release --workspace"
 command -v docker >/dev/null 2>&1 \
-  || die "docker is required: three of the five legs compare against ${BASELINE_IMAGE}"
+  || die "docker is required: every leg compares against ${BASELINE_IMAGE} or ${FOLD_BASELINE_IMAGE}"
 command -v python3 >/dev/null 2>&1 || die "python3 is required"
 python3 -c 'import opentelemetry.proto' 2>/dev/null \
   || die "tracegen's http-pb protocol needs opentelemetry-proto: pip install -r ${LAB_ROOT}/tools/tracegen/requirements.txt"
-docker pull -q "${BASELINE_IMAGE}" >/dev/null 2>&1 \
-  || warn "could not refresh ${BASELINE_IMAGE}, using the local copy"
-docker image inspect "${BASELINE_IMAGE}" >/dev/null 2>&1 \
-  || die "baseline image unavailable: ${BASELINE_IMAGE}"
+for image in "${BASELINE_IMAGE}" "${FOLD_BASELINE_IMAGE}"; do
+  docker pull -q "${image}" >/dev/null 2>&1 \
+    || warn "could not refresh ${image}, using the local copy"
+  docker image inspect "${image}" >/dev/null 2>&1 \
+    || die "baseline image unavailable: ${image}"
+done
 VERSION="$("${PERF_SENTINEL_LOCAL_BIN}" --version 2>/dev/null | awk '{print $2}')"
 PRODUCT_COMMIT="$(git -C "${PERF_SENTINEL_REPO_PATH}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 ok "under test: ${PERF_SENTINEL_LOCAL_BIN} ${VERSION} (${PRODUCT_COMMIT})"
-ok "baseline:   ${BASELINE_IMAGE}"
+ok "baseline:   ${BASELINE_IMAGE} (legs A, B, C, E)"
+ok "fold:       ${FOLD_BASELINE_IMAGE} (leg D)"
 
 # --- helpers -----------------------------------------------------------------
 
@@ -192,16 +207,18 @@ start_local_daemon() {
     || die "the daemon under test never became ready: $(tail -3 "${TMP_DIR}/daemon.log")"
 }
 
-start_baseline_daemon() {
+start_baseline_daemon() {  # $1 = container name, $2 = image, $3 = host http port
+  # Same config for both containers: they listen on the same in-container
+  # ports and only the published one differs.
   write_config "${TMP_DIR}/baseline.toml" 0.0.0.0 14318 14317 ""
-  docker rm -f "${BASELINE_NAME}" >/dev/null 2>&1
-  docker run -d --name "${BASELINE_NAME}" \
-    -p "${BASELINE_HTTP_PORT}:14318" \
+  docker rm -f "$1" >/dev/null 2>&1
+  docker run -d --name "$1" \
+    -p "$3:14318" \
     -v "${TMP_DIR}/baseline.toml:/etc/perf-sentinel/config.toml:ro" \
-    "${BASELINE_IMAGE}" watch --config /etc/perf-sentinel/config.toml >/dev/null \
-    || die "baseline container failed to start on ${BASELINE_IMAGE}"
-  wait_ready "${BASELINE_URL}" \
-    || die "baseline never became ready: $(docker logs "${BASELINE_NAME}" 2>&1 | tail -3)"
+    "$2" watch --config /etc/perf-sentinel/config.toml >/dev/null \
+    || die "baseline container failed to start on $2"
+  wait_ready "http://127.0.0.1:$3" \
+    || die "baseline never became ready on $2: $(docker logs "$1" 2>&1 | tail -3)"
 }
 
 SEND_FAILURES=0
@@ -233,10 +250,11 @@ rows() {  # $1 = base url, $2 = query -> row count on stdout
 
 # --- corpus ------------------------------------------------------------------
 
-step "Start both daemons and feed them the same corpus"
+step "Start the three daemons and feed them the same corpus"
 start_local_daemon
-start_baseline_daemon
-for url in "${DAEMON_URL}" "${BASELINE_URL}"; do
+start_baseline_daemon "${BASELINE_NAME}" "${BASELINE_IMAGE}" "${BASELINE_HTTP_PORT}"
+start_baseline_daemon "${FOLD_BASELINE_NAME}" "${FOLD_BASELINE_IMAGE}" "${FOLD_BASELINE_HTTP_PORT}"
+for url in "${DAEMON_URL}" "${BASELINE_URL}" "${FOLD_BASELINE_URL}"; do
   send "${url}" "${TENANT_A}" "${SEED_A}" 6 8
   send "${url}" "${TENANT_B}" "${SEED_B}" 4 6
 done
@@ -250,8 +268,11 @@ TOTAL="$(rows "${DAEMON_URL}" "include_acked=true&limit=1000")"
   || die "only ${TOTAL} folded rows under test, the corpus did not land; see ${TMP_DIR}/daemon.log"
 BASE_TOTAL="$(rows "${BASELINE_URL}" "include_acked=true&limit=1000")"
 [ "${BASE_TOTAL}" -eq "${TOTAL}" ] \
-  || die "the two daemons folded the same corpus into different row counts (${BASE_TOTAL} vs ${TOTAL}); every comparison below would grade that instead"
-ok "${TOTAL} folded rows on each side"
+  || die "${BASELINE_IMAGE} and the build under test folded the same corpus into different row counts (${BASE_TOTAL} vs ${TOTAL}); every comparison below would grade that instead"
+FOLD_TOTAL="$(rows "${FOLD_BASELINE_URL}" "include_acked=true&limit=1000")"
+[ "${FOLD_TOTAL}" -eq "${TOTAL}" ] \
+  || die "${FOLD_BASELINE_IMAGE} and the build under test folded the same corpus into different row counts (${FOLD_TOTAL} vs ${TOTAL}); leg D would grade that instead"
+ok "${TOTAL} folded rows on each of the three daemons"
 
 # The feature probe, and its floor. A release branch keeps the previous
 # version in Cargo.toml until tag time, so `--version` cannot answer whether
@@ -407,18 +428,19 @@ fi
 
 # --- D. the fold is unchanged ------------------------------------------------
 
-step "D. the folded listing is what ${BASELINE_IMAGE} returns"
-# Read the baseline with include_acked, and the side under test too: leg C
+step "D. the folded listing is what ${FOLD_BASELINE_IMAGE} returns"
+# Read the reference with include_acked, and the side under test too: leg C
 # left one ack behind on the local daemon and the comparison must not grade
 # that. Both pages are the whole listing, so `offset` plays no part here,
 # which is the point: what is compared is the fold, not the paging.
-fetch "${BASELINE_URL}" "include_acked=true&limit=1000" "${TMP_DIR}/fold-baseline.json"
+fetch "${FOLD_BASELINE_URL}" "include_acked=true&limit=1000" "${TMP_DIR}/fold-baseline.json"
 fetch "${DAEMON_URL}" "include_acked=true&limit=1000" "${TMP_DIR}/fold-under-test.json"
 if python3 "${FOLD}" compare "${TMP_DIR}/fold-baseline.json" "${TMP_DIR}/fold-under-test.json" \
      > "${TMP_DIR}/fold-diff.txt" 2>&1; then
-  pass "D" "${TOTAL} rows identical to ${BASELINE_IMAGE}: same batches in the same order, same representative, same counts"
+  pass "D" "${TOTAL} rows identical to ${FOLD_BASELINE_IMAGE}: same batches in the same order (a batch split across two ticks merged back), same representative, same counts"
+  sed 's/^/  note: /' "${TMP_DIR}/fold-diff.txt"
 else
-  fail "D" "the rewritten fold returns something the published release does not, see ${TMP_DIR}/fold-diff.txt"
+  fail "D" "the fold returns something the latest release does not, see ${TMP_DIR}/fold-diff.txt"
   head -12 "${TMP_DIR}/fold-diff.txt"
 fi
 
@@ -508,7 +530,8 @@ VERDICT="PASS"; [ "${FAILURES}" -gt 0 ] && VERDICT="FAIL"
   echo
   echo "Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "Under test: ${VERSION} (${PRODUCT_COMMIT})"
-  echo "Baseline:   ${BASELINE_IMAGE}"
+  echo "Baseline:   ${BASELINE_IMAGE} (legs A, B, C, E)"
+  echo "Fold:       ${FOLD_BASELINE_IMAGE} (leg D)"
   echo "Corpus:     ${TOTAL} folded rows over ${TENANT_A} and ${TENANT_B}"
   echo
   echo "| check | verdict | evidence |"
