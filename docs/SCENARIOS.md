@@ -272,7 +272,9 @@ placeholder and unsanitizable destinations refused. The
 AppSec remediation: source_endpoint redaction, ack API-key enforcement
 on reads with the `PERF_SENTINEL_ACK_API_KEY` override, the real
 quality gate on `/api/export/report`, the verify-hash attestation
-PARTIAL cap, and the non-loopback bind advisory.
+PARTIAL cap, and the non-loopback bind advisory. Its leg F adds the
+`[daemon] require_read_key` read gate and the `perf-sentinel query
+--api-key-file` key, and needs a binary newer than 0.26.2.
 
 The `consumer-endpoint` gate locks the same rule on the daemon path.
 notification-service consumes the `perfsim.order-service` queue under
@@ -2406,7 +2408,8 @@ no cluster, Docker not required.
 
 `appsec-hardening` validates the 0.9.15 AppSec remediation end to end,
 self-contained (local release binary + throwaway loopback daemon, no
-cluster, no Docker). Five legs: **A** batch-analyzes a synthetic
+cluster, no Docker). Six legs, and leg F needs a binary newer than
+0.26.2. **A** batch-analyzes a synthetic
 native fixture whose N+1 parent URL carries `user:pass@`,
 `?token=SECRET` and `#frag`. The finding's `source_endpoint` and
 signature must come back stripped, while a path-`@`
@@ -2432,9 +2435,29 @@ not a discriminator, since an unsigned report is PARTIAL on both
 versions. **E** binds `0.0.0.0` and asserts the non-loopback advisory
 is logged while the daemon still serves. It then pins the 0.9.15
 matcher widening with a second bind on `[::1]` that must stay silent,
-where the 0.9.14 string-compare matcher warned on it. Ports
-14406-14407 on loopback. Leg E binds 14408-14409 on all interfaces,
-then on `[::1]`.
+where the 0.9.14 string-compare matcher warned on it. **F** restarts
+the daemon with `[daemon] require_read_key = true`, an incidents key
+and `[daemon.cors] allowed_origins = ["http://lab.invalid"]`. A bare
+`GET /api/findings` answers 401 with
+`{"error":"missing or invalid X-API-Key or Authorization: Bearer"}`.
+The read key opens it as `X-API-Key` and as `Authorization: Bearer`,
+the wire shape of the IDE plugin, and so does the ack key, because the
+gate accepts the route's own write key. On `GET /api/incidents` the
+incidents key answers 200, while the ack key answers 401 and moves
+`perf_sentinel_incidents_rejected_total{reason="unauthorized"}` by
+one. An unknown path stays 404, and an `OPTIONS` preflight from the
+allowed origin asking for `x-api-key` passes without a key, which is
+the transport the live report's key prompt depends on. `/health` and
+`/metrics` stay open, and the read key still cannot ack. The config
+load refuses `require_read_key` without `read_api_key`, and with
+`allowed_origins = ["*"]` even when no write key is set.
+`perf-sentinel query --daemon <url> --api-key-file <0600 file>
+findings` exits 0. Without a key it exits 1 with a message naming the
+401 and `--api-key-file`, not "Is `perf-sentinel watch` running?".
+With a wrong `PERF_SENTINEL_DAEMON_API_KEY` and a correct file it
+exits 1, because the env var wins. Leg F fails on any binary up to
+0.26.2. Ports 14406-14407 on loopback for legs B, C and F. Leg E binds
+14408-14409 on all interfaces, then on `[::1]`.
 
 ## endpoint-resolution (0.9.22 `source.endpoint`)
 

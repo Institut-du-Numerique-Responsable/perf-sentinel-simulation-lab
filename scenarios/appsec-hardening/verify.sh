@@ -18,9 +18,17 @@
 #      with a hint to the new --verify-binary flag (absent from 0.9.14).
 #   E. Non-loopback bind logs the widened advisory but the daemon still serves
 #      (warning, not a refusal).
+#   F. [daemon] require_read_key: every GET under /api needs the read key or
+#      the route's own write key (ack key, incidents key on /api/incidents),
+#      while /health, /metrics, an unknown path and the CORS preflight stay
+#      open. The config refuses it without read_api_key or with
+#      allowed_origins = ["*"], and `perf-sentinel query --api-key-file`
+#      carries the key (PERF_SENTINEL_DAEMON_API_KEY wins over the file).
 #
-# Self-contained: needs only the local release binary (>= 0.20.0 for the
-# read key in leg B).
+# Self-contained: needs only the local release binary. Leg F needs a binary
+# newer than the 0.26.2 release (require_read_key, `query --api-key-file`):
+# the released 0.26.2 and older fail it by design. A build of perf-sentinel
+# main after 0.26.2 still prints 0.26.2 until the next tag, and passes.
 set -euo pipefail
 
 SCENARIO="appsec-hardening"
@@ -49,6 +57,8 @@ ENV_KEY="lab-env-key-0000"
 # Must differ from the ack key of every daemon this script starts (TOML in
 # one run, env in the other): equal to it, it would be that key.
 READ_KEY="lab-read-key-0000"
+# Leg F: the incidents write key, distinct from the read and ack keys.
+INC_KEY="lab-inc-key-00000"
 
 color_blue()  { printf "\033[34m%s\033[0m\n" "$*"; }
 color_green() { printf "\033[32m%s\033[0m\n" "$*"; }
@@ -94,7 +104,7 @@ record "A-redaction" "PASS" "stripped endpoint + signature, path-@ and route tem
 ok "endpoint stripped to http://shop-svc/api/orders (critical), path-@ and template intact"
 
 # =============================================================================
-write_daemon_toml() {  # $1 = listen address, $2 = http port, $3 = grpc port, $4 = socket
+write_daemon_toml() {  # $1 = listen address, $2 = http port, $3 = grpc port, $4 = socket, $5 = extra [daemon] lines
   cat > "${TMP_DIR}/daemon.toml" <<EOF
 [daemon]
 listen_address = "$1"
@@ -104,6 +114,7 @@ json_socket = "$4"
 api_enabled = true
 trace_ttl_ms = 1500
 read_api_key = "${READ_KEY}"
+${5:-}
 
 [daemon.ack]
 enabled = true
@@ -123,21 +134,22 @@ start_daemon() {  # $1... = env wrapper command prefix (env -u VAR | env VAR=x)
   # The ports are fixed: wait until nothing serves them anymore, then require
   # silence before spawning, so the daemon that later answers readiness is OURS
   # (a leftover from an aborted run would otherwise pass with a stale binary).
+  # /health, not /api/status: require_read_key (leg F) answers 401 on /api/*.
   for _ in $(seq 1 20); do
-    curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1 || break
+    curl -fsS "${DAEMON_URL}/health" >/dev/null 2>&1 || break
     sleep 0.5
   done
-  curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1 \
+  curl -fsS "${DAEMON_URL}/health" >/dev/null 2>&1 \
     && die "something already serves ${DAEMON_URL} - leftover daemon from a previous run?"
   rm -f "${SOCK}"
   "$@" "${PERF_SENTINEL_LOCAL_BIN}" watch --config "${TMP_DIR}/daemon.toml" > "${TMP_DIR}/daemon.log" 2>&1 &
   DAEMON_PID=$!
   for _ in $(seq 1 40); do
-    curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1 && break
+    curl -fsS "${DAEMON_URL}/health" >/dev/null 2>&1 && break
     sleep 0.5
   done
   kill -0 "${DAEMON_PID}" 2>/dev/null || die "spawned daemon died: $(tail -3 "${TMP_DIR}/daemon.log")"
-  curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1 || die "daemon not ready: $(tail -3 "${TMP_DIR}/daemon.log")"
+  curl -fsS "${DAEMON_URL}/health" >/dev/null 2>&1 || die "daemon not ready: $(tail -3 "${TMP_DIR}/daemon.log")"
 }
 
 acks_code() {  # $1 = optional api key ("" = no header)
@@ -335,6 +347,134 @@ grep -q "non-loopback" "${TMP_DIR}/daemon.log" && die "widened matcher regressed
 record "E-bind-warns" "PASS" "0.0.0.0 warns+serves; [::1] silent (widened-matcher discriminator)"
 ok "0.0.0.0 warns, [::1] silent - the widening is pinned"
 kill "${DAEMON_PID}" 2>/dev/null || true; DAEMON_PID=""
+
+# =============================================================================
+step "F. [daemon] require_read_key: every /api GET needs a key, the rest stays open"
+DAEMON_URL="http://127.0.0.1:${DAEMON_HTTP_PORT}"
+NO_KEYS=(env -u PERF_SENTINEL_ACK_API_KEY -u PERF_SENTINEL_READ_API_KEY -u PERF_SENTINEL_INCIDENTS_API_KEY)
+write_daemon_toml "127.0.0.1" "${DAEMON_HTTP_PORT}" "${DAEMON_GRPC_PORT}" "${SOCK}" "require_read_key = true"
+cat >> "${TMP_DIR}/daemon.toml" <<EOF
+
+[daemon.incidents]
+enabled = true
+api_key = "${INC_KEY}"
+
+[daemon.cors]
+allowed_origins = ["http://lab.invalid"]
+EOF
+start_daemon "${NO_KEYS[@]}"
+
+get_code() {  # $1 = path, $2... = extra curl args
+  local path="$1"; shift
+  curl -s -o /dev/null -w '%{http_code}' "$@" "${DAEMON_URL}${path}"
+}
+inc_unauth() {
+  curl -s "${DAEMON_URL}/metrics" \
+    | awk '/^perf_sentinel_incidents_rejected_total\{.*reason="unauthorized".*\}/ {n += $2} END {print n + 0}'
+}
+
+BODY="$(curl -s -w '\n%{http_code}' "${DAEMON_URL}/api/findings")"
+code="$(echo "${BODY}" | tail -1)"; BODY="$(echo "${BODY}" | sed '$d')"
+[ "${code}" = "401" ] || die "bare GET /api/findings: expected 401, got ${code}"
+echo "${BODY}" | jq -e '.error == "missing or invalid X-API-Key or Authorization: Bearer"' >/dev/null \
+  || die "401 body unexpected: ${BODY}"
+code="$(get_code /api/findings -H "X-API-Key: ${READ_KEY}")"
+[ "${code}" = "200" ] || die "read key as X-API-Key on /api/findings: expected 200, got ${code}"
+# The Bearer form is the daemon wire shape the IDE plugin sends.
+code="$(get_code /api/findings -H "Authorization: Bearer ${READ_KEY}")"
+[ "${code}" = "200" ] || die "read key as Bearer on /api/findings: expected 200, got ${code}"
+code="$(get_code /api/findings -H "X-API-Key: ${TOML_KEY}")"
+[ "${code}" = "200" ] || die "ack key on /api/findings: expected 200 (the route's own key), got ${code}"
+record "F-read-gate" "PASS" "bare 401 ${BODY}; read key 200 as X-API-Key and Bearer; ack key 200"
+ok "GET /api/findings: 401 bare, 200 with the read key (both forms) and the ack key"
+
+I0="$(inc_unauth)"
+code="$(get_code /api/incidents -H "X-API-Key: ${INC_KEY}")"
+[ "${code}" = "200" ] || die "incidents key on GET /api/incidents: expected 200, got ${code}"
+code="$(get_code /api/incidents -H "X-API-Key: ${TOML_KEY}")"
+[ "${code}" = "401" ] || die "ack key on GET /api/incidents: expected 401 (not that route's key), got ${code}"
+I1="$(inc_unauth)"
+[ "${I1}" -eq $((I0 + 1)) ] \
+  || die "incidents_rejected_total{reason=unauthorized}: ${I0} -> ${I1}, expected +1"
+record "F-incidents-key" "PASS" "incidents key 200, ack key 401, refused counter ${I0} -> ${I1}"
+ok "GET /api/incidents takes the incidents key, refuses the ack key and counts it"
+
+code="$(get_code /api/does-not-exist)"
+[ "${code}" = "404" ] || die "unknown path without a key: expected 404, got ${code}"
+PRE="$(curl -s -o /dev/null -D - -X OPTIONS -H "Origin: http://lab.invalid" \
+  -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: x-api-key" \
+  "${DAEMON_URL}/api/findings")"
+PRE_CODE="$(echo "${PRE}" | awk 'NR==1 {print $2}')"
+case "${PRE_CODE}" in 2??) ;; *) die "CORS preflight: expected 2xx without a key, got ${PRE_CODE}";; esac
+echo "${PRE}" | grep -qi '^access-control-allow-origin: http://lab.invalid' \
+  || die "CORS preflight lacks Access-Control-Allow-Origin: ${PRE}"
+for p in /health /metrics; do
+  code="$(get_code "${p}")"
+  [ "${code}" = "200" ] || die "${p} without a key: expected 200, got ${code}"
+done
+code="$(ack_post "X-API-Key" "${READ_KEY}")"
+[ "${code}" = "401" ] || die "the read key wrote an ack under require_read_key, got ${code}"
+record "F-open-surface" "PASS" "unknown path 404, preflight ${PRE_CODE} with Allow-Origin, /health + /metrics 200, read key never writes"
+ok "404, preflight, /health and /metrics need no key; the read key still never writes"
+
+step "F. perf-sentinel query --api-key-file carries the key, the env var wins"
+KEY_FILE="${TMP_DIR}/read.key"
+( umask 077; printf '%s\n' "${READ_KEY}" > "${KEY_FILE}" )
+chmod 600 "${KEY_FILE}"
+env -u PERF_SENTINEL_DAEMON_API_KEY "${PERF_SENTINEL_LOCAL_BIN}" query --daemon "${DAEMON_URL}" \
+  --api-key-file "${KEY_FILE}" findings > "${TMP_DIR}/q.out" 2>&1 \
+  || die "query with --api-key-file failed: $(tail -3 "${TMP_DIR}/q.out")"
+set +e
+env -u PERF_SENTINEL_DAEMON_API_KEY "${PERF_SENTINEL_LOCAL_BIN}" query --daemon "${DAEMON_URL}" \
+  findings > "${TMP_DIR}/q-nokey.out" 2>&1; c_nokey=$?
+env PERF_SENTINEL_DAEMON_API_KEY=lab-wrong-key-000 "${PERF_SENTINEL_LOCAL_BIN}" query --daemon "${DAEMON_URL}" \
+  --api-key-file "${KEY_FILE}" findings > "${TMP_DIR}/q-wrongenv.out" 2>&1; c_env=$?
+set -e
+for f in q-nokey q-wrongenv; do
+  grep -q '401' "${TMP_DIR}/${f}.out" && grep -q -- '--api-key-file' "${TMP_DIR}/${f}.out" \
+    || die "${f}: refusal does not name the 401 and the key: $(cat "${TMP_DIR}/${f}.out")"
+  grep -q 'perf-sentinel watch` running' "${TMP_DIR}/${f}.out" \
+    && die "${f}: a 401 was reported as a daemon that is down"
+done
+[ "${c_nokey}" -eq 1 ] || die "query without a key: expected exit 1, got ${c_nokey}"
+[ "${c_env}" -eq 1 ] || die "query with a wrong env key and a good file: expected exit 1 (env wins), got ${c_env}"
+record "F-query-cli" "PASS" "--api-key-file exit 0; no key exit 1 naming the 401; wrong env + good file exit 1 (env wins)"
+ok "query: file key 0, no key 1 (401 named), wrong env over a good file 1"
+kill "${DAEMON_PID}" 2>/dev/null || true; DAEMON_PID=""
+
+step "F. require_read_key is refused at load without read_api_key or with CORS \"*\""
+reject_case() {  # $1 = label, $2 = toml body, $3 = fixed string the error must carry
+  printf '%s\n' "$2" > "${TMP_DIR}/f-reject.toml"
+  "${NO_KEYS[@]}" "${PERF_SENTINEL_LOCAL_BIN}" watch --config "${TMP_DIR}/f-reject.toml" \
+    > "${TMP_DIR}/f-reject.log" 2>&1 &
+  local pid=$!
+  for _ in $(seq 1 10); do kill -0 "${pid}" 2>/dev/null || break; sleep 0.5; done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill "${pid}" 2>/dev/null || true; wait "${pid}" 2>/dev/null || true
+    die "$1: config was ACCEPTED at load"
+  fi
+  wait "${pid}" 2>/dev/null || true
+  grep -qF -- "$3" "${TMP_DIR}/f-reject.log" \
+    || die "$1: refused without the documented message: $(tail -2 "${TMP_DIR}/f-reject.log")"
+}
+BASE="[daemon]
+listen_address = \"127.0.0.1\"
+listen_port_http = ${DAEMON_HTTP_PORT}
+listen_port_grpc = ${DAEMON_GRPC_PORT}
+json_socket = \"${SOCK}\"
+api_enabled = true
+require_read_key = true"
+reject_case "no read_api_key" "${BASE}" \
+  "[daemon] require_read_key = true needs [daemon] read_api_key"
+# No write key here: require_read_key alone must be what refuses the wildcard.
+reject_case "allowed_origins *" "${BASE}
+read_api_key = \"${READ_KEY}\"
+
+[daemon.cors]
+allowed_origins = [\"*\"]" \
+  "or with [daemon] require_read_key"
+record "F-config-refusals" "PASS" "refused without read_api_key and with allowed_origins = [\"*\"]"
+ok "both invalid require_read_key configs refused at load with the documented message"
 
 # =============================================================================
 step "Summary"
