@@ -218,6 +218,7 @@ spec:
             claimName: perf-sentinel-hub-data
         - name: tmp
           emptyDir: {}
-# No ServiceMonitor: the Hub exposes no /metrics endpoint. Scenarios assert on
+# No ServiceMonitor: with no Hub:MetricsPort set, the Hub answers /metrics on
+# 8080 beside its API, but nothing scrapes it here. Scenarios assert on
 # its HTTP API, its structured logs (event ids 1001, 1101-1103, 1201, 1301) and
 # the SQLite file itself.
