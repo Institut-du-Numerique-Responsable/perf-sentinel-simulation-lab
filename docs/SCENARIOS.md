@@ -215,7 +215,8 @@ cover the ack workflow, and the query monitor data plane through
 `/api/energy`, the extended `/api/status`, and the six
 energy/carbon/capacity gauges.
 
-They cover the disclose (two-tier waste v1.1), disclose-temporal
+They cover the disclose (two-tier waste v1.1, and since 0.28.0 the
+attestation naming the content hash), disclose-temporal
 (continuity v1.2), and verify-hash CLI, plus the five 0.8.13
 disclosure/chart gates: `sci-functional-unit` G1 SCI-per-trace
 intensity, `rgesn-crosswalk` G2 RGESN crosswalk, `esrs-e1-crosswalk`

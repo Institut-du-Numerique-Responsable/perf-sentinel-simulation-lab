@@ -43,6 +43,24 @@ committed fixtures.
    `canonical_waste.waste_ratio > operational_waste.waste_ratio`. Raising
    the operator threshold under-reports the operational tier, but it cannot
    touch the canonical headline.
+5. **transport bracket**: `transport_kgco2eq_low`/`_high` are published on
+   an archive every window of which declares the fixed coefficient, and
+   withheld as soon as one window contributed transport without declaring it.
+6. **canonical-disclosure migration**: a mixed current/legacy official period
+   succeeds with a counted warning, a 100% legacy one is refused.
+7. **attestation binding** (0.28.0+): the in-toto subject is the canonical
+   `content_hash` and the predicate declares `subject_binding`, so the
+   attestation stays bound once the signature locator is patched into the
+   report. Figures edited after signing and re-baked with
+   `hash-bake --allow-signed` fail the binding (UNTRUSTED, exit 1). An
+   attestation written by the published 0.27.0 binary is bound while the
+   report is untouched and unbindable once patched (PARTIAL, never TRUSTED).
+   No bundle is signed: the binding check is pure Rust and runs whenever an
+   attestation is passed.
+8. **archive reach** (0.28.0+): an official `disclose` over the quarter
+   exits 2 without a report because the fixtures' archive starts on
+   2026-06-05, and an internal one warns. The official legs of sub-tests 3, 6
+   and 7 declare a custom period from 2026-06-05 for that reason.
 
 ## Fixtures
 

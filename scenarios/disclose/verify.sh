@@ -16,7 +16,7 @@
 #   - reports-thr50.ndjson  operator threshold 50, canonical 2 (same workload;
 #                           n+1 reclassified to redundant at the high threshold)
 #
-# 6 sub-tests run inside the perf-sentinel image under validation:
+# 8 sub-tests run inside the perf-sentinel image under validation:
 #
 #   1. recognized schema + tiers: schema_version is perf-sentinel-report/v1.x,
 #      canonical threshold == 2, operational threshold == 5, both tiers
@@ -39,6 +39,16 @@
 #      it, which is every window archived before 0.9.25.
 #   6. canonical-disclosure migration: a mixed current/legacy period succeeds
 #      with a counted warning. A 100% legacy official period remains refused.
+#   7. attestation binding (0.28.0+): the in-toto subject is the canonical
+#      content hash, so the attestation stays bound once the signature locator
+#      is patched into report.json. Figures edited after signing and re-baked
+#      with `hash-bake --allow-signed` fail the binding (UNTRUSTED, exit 1). An
+#      attestation written by the published 0.27.0 binary, whose subject pinned
+#      the pre-patch file bytes, is bound while the report is untouched and
+#      unbindable once patched (PARTIAL, never TRUSTED).
+#   8. archive reach (0.28.0+): official disclose refuses a period whose first
+#      day precedes the oldest archived window (exit 2, no report), internal
+#      warns. The official legs above use a period the fixtures do reach.
 #
 # Fixtures under fixtures/:
 #   - reports-thr5.ndjson, reports-thr50.ndjson, org-config.toml
@@ -72,6 +82,10 @@ fail() { color_red   "    fail: $*"; }
 die()  { color_red   "    error: $*"; exit 1; }
 
 PERIOD_ARGS=(--period-type calendar-quarter --from 2026-04-01 --to 2026-06-30)
+# The fixtures' archive starts on 2026-06-05. From 0.28.0 an official
+# disclosure refuses a period its archive does not reach back to (sub-test 8),
+# so the official legs declare a custom period starting that day.
+OFFICIAL_PERIOD_ARGS=(--period-type custom --from 2026-06-05 --to 2026-07-04)
 
 step "0. Pre-flight"
 command -v docker >/dev/null || die "docker not on PATH"
@@ -157,7 +171,7 @@ fi
 
 step "3. official intent validates + verify-hash content_hash round-trips"
 t3="FAIL"; t3note=""
-if in_image disclose --intent official --confidentiality public "${PERIOD_ARGS[@]}" \
+if in_image disclose --intent official --confidentiality public "${OFFICIAL_PERIOD_ARGS[@]}" \
      --input /workdir/reports-thr5.ndjson --output /workdir/out-official.json \
      --org-config /workdir/org-config.toml >/dev/null 2>&1; then
   vh="$(in_image verify-hash --report /workdir/out-official.json --no-identity-check --format json 2>/dev/null || true)"
@@ -317,11 +331,11 @@ for row in rows:
 (out / "canonical-old.ndjson").write_text("\n".join(map(json.dumps, old)) + "\n")
 PY
 rm -f "${TMP_DIR}/out-canonical-mixed.json" "${TMP_DIR}/out-canonical-old.json"
-in_image disclose --intent official --confidentiality public "${PERIOD_ARGS[@]}" \
+in_image disclose --intent official --confidentiality public "${OFFICIAL_PERIOD_ARGS[@]}" \
   --input /workdir/canonical-mixed.ndjson --output /workdir/out-canonical-mixed.json \
   --org-config /workdir/org-config.toml > "${TMP_DIR}/canonical-mixed.out" 2> "${TMP_DIR}/canonical-mixed.err" \
   && MIXED_RC=0 || MIXED_RC=$?
-in_image disclose --intent official --confidentiality public "${PERIOD_ARGS[@]}" \
+in_image disclose --intent official --confidentiality public "${OFFICIAL_PERIOD_ARGS[@]}" \
   --input /workdir/canonical-old.ndjson --output /workdir/out-canonical-old.json \
   --org-config /workdir/org-config.toml > "${TMP_DIR}/canonical-old.out" 2> "${TMP_DIR}/canonical-old.err" \
   && OLD_RC=0 || OLD_RC=$?
@@ -337,6 +351,161 @@ if [ "${MIXED_RC}" = "0" ] && [ "${MIXED_WARNING_COUNT}" = "1" ] \
 else
   note="mixed rc=${MIXED_RC}/warnings=${MIXED_WARNING_COUNT}; all-legacy rc=${OLD_RC}/bytes=${OLD_BYTES}"
   fail "${note}"; record "6. canonical migration boundary" FAIL "${note}"
+fi
+
+# === Sub-test 7: the signed attestation names the figures it vouches for ===
+# Until 0.27.0 the in-toto subject was the SHA-256 of report.json's bytes at
+# disclose time, the documented signing flow then patched integrity.signature
+# into report.json, and verify-hash never compared the two, so a valid
+# signature tied to nothing in the published figures. No bundle is signed here
+# (no Sigstore identity in the lab): the binding check is pure Rust and runs
+# whenever an attestation is passed, which is what these legs assert.
+step "7. attestation binding: survives the locator patch, refuses re-baked figures, flags a 0.27.0 statement"
+
+# What step 3 of the signing flow does to report.json.
+patch_signature() {
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1]))
+r["integrity"]["signature"] = {
+    "format": "sigstore-cosign-intoto-v1",
+    "bundle_url": "https://example.fr/bundle.sig",
+    "signer_identity": "https://github.com/example/infra/.github/workflows/disclose.yml@refs/tags/2026-q2",
+    "signer_issuer": "https://token.actions.githubusercontent.com",
+    "rekor_url": "https://rekor.sigstore.dev",
+    "rekor_log_index": 1,
+    "signed_at": "2026-07-02T10:00:00Z",
+}
+r["report_metadata"]["integrity_level"] = "signed"
+json.dump(r, open(sys.argv[2], "w"), indent=2)
+PY
+}
+
+# status <verify-hash json file> <check>: ok, fail, skip, not_provided or the overall label.
+status() {
+  python3 - "$1" "$2" <<'PY' 2>/dev/null || echo unknown
+import json, sys
+v = json.load(open(sys.argv[1]))
+print(v["overall"] if sys.argv[2] == "overall" else v["verifications"][sys.argv[2]]["status"])
+PY
+}
+
+verify_with() {  # <report> <attestation> <out json>: exit code on stdout
+  local rc
+  in_image verify-hash --report "/workdir/$1" --attestation "/workdir/$2" \
+    --no-identity-check --format json > "${TMP_DIR}/$3" 2>/dev/null && rc=0 || rc=$?
+  echo "${rc}"
+}
+
+rm -f "${TMP_DIR}"/att-*.intoto.jsonl "${TMP_DIR}"/out-att*.json "${TMP_DIR}"/out-legacy*.json "${TMP_DIR}"/vh7-*.json
+
+# 7a. bound, and still bound after the patch
+t7a="FAIL"; t7anote="official disclose with --emit-attestation did not exit 0"
+if in_image disclose --intent official --confidentiality public "${OFFICIAL_PERIOD_ARGS[@]}" \
+     --input /workdir/reports-thr5.ndjson --output /workdir/out-att.json \
+     --org-config /workdir/org-config.toml --emit-attestation /workdir/att-current.intoto.jsonl >/dev/null 2>&1; then
+  shape="$(python3 - "${TMP_DIR}/out-att.json" "${TMP_DIR}/att-current.intoto.jsonl" <<'PY' || true
+import json, sys
+report = json.load(open(sys.argv[1]))
+statement = json.loads(open(sys.argv[2]).read().strip())
+subject = statement["subject"][0]["digest"]["sha256"]
+want = report["integrity"]["content_hash"].removeprefix("sha256:")
+binding = statement["predicate"].get("subject_binding")
+print("ok" if subject == want and binding == "content_hash" else f"subject={subject[:12]} want={want[:12]} binding={binding}")
+PY
+)"
+  patch_signature "${TMP_DIR}/out-att.json" "${TMP_DIR}/out-att-patched.json"
+  rc="$(verify_with out-att-patched.json att-current.intoto.jsonl vh7-a.json)"
+  ch="$(status "${TMP_DIR}/vh7-a.json" content_hash)"; ab="$(status "${TMP_DIR}/vh7-a.json" attestation_binding)"
+  if [ "${shape}" = "ok" ] && [ "${ch}" = "ok" ] && [ "${ab}" = "ok" ] && [ "${rc}" = "2" ]; then
+    t7a="PASS"; t7anote="subject == content_hash, subject_binding declared; patched report: content_hash ok, binding ok, exit 2 (no bundle)"
+  else
+    t7anote="shape=${shape}, patched content_hash=${ch}, binding=${ab}, exit=${rc} (want ok/ok/ok/2)"
+  fi
+fi
+if [ "${t7a}" = "PASS" ]; then ok "${t7anote}"; else fail "${t7anote}"; fi
+record "7a. binding survives the patch" "${t7a}" "${t7anote}"
+
+# 7b. figures edited after signing, hash re-baked
+t7b="FAIL"; t7bnote="no patched report from 7a"
+if [ -f "${TMP_DIR}/out-att-patched.json" ]; then
+  python3 - "${TMP_DIR}/out-att-patched.json" "${TMP_DIR}/out-att-edited.json" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1]))
+r["aggregate"]["total_carbon_kgco2eq"] /= 2
+json.dump(r, open(sys.argv[2], "w"), indent=2)
+PY
+  if in_image hash-bake --report /workdir/out-att-edited.json --output /workdir/out-att-rebaked.json --allow-signed >/dev/null 2>&1; then
+    rc="$(verify_with out-att-rebaked.json att-current.intoto.jsonl vh7-b.json)"
+    ch="$(status "${TMP_DIR}/vh7-b.json" content_hash)"; ab="$(status "${TMP_DIR}/vh7-b.json" attestation_binding)"
+    overall="$(status "${TMP_DIR}/vh7-b.json" overall)"
+    if [ "${ch}" = "ok" ] && [ "${ab}" = "fail" ] && [ "${overall}" = "UNTRUSTED" ] && [ "${rc}" = "1" ]; then
+      t7b="PASS"; t7bnote="re-baked hash ok, binding fail, UNTRUSTED, exit 1"
+    else
+      t7bnote="content_hash=${ch}, binding=${ab}, overall=${overall}, exit=${rc} (want ok/fail/UNTRUSTED/1)"
+    fi
+  else
+    t7bnote="hash-bake --allow-signed did not exit 0"
+  fi
+fi
+if [ "${t7b}" = "PASS" ]; then ok "${t7bnote}"; else fail "${t7bnote}"; fi
+record "7b. re-baked figures refused" "${t7b}" "${t7bnote}"
+
+# 7c. a statement from the published 0.27.0 binary. Pinned on purpose: it is
+# the last release whose subject is the file bytes, the compatibility leg
+# resolve-image.sh tells a scenario to name at its call site.
+LEGACY_IMAGE="ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.27.0"
+t7c="FAIL"; t7cnote="cannot pull ${LEGACY_IMAGE}"
+if docker image inspect "${LEGACY_IMAGE}" >/dev/null 2>&1 || docker pull "${LEGACY_IMAGE}" >/dev/null 2>&1; then
+  t7cnote="0.27.0 disclose with --emit-attestation did not exit 0"
+  if docker run --rm -u "$(id -u):$(id -g)" -v "${TMP_DIR}:/workdir" "${LEGACY_IMAGE}" \
+       disclose --intent official --confidentiality public "${OFFICIAL_PERIOD_ARGS[@]}" \
+       --input /workdir/reports-thr5.ndjson --output /workdir/out-legacy.json \
+       --org-config /workdir/org-config.toml --emit-attestation /workdir/att-legacy.intoto.jsonl >/dev/null 2>&1; then
+    old_shape="$(python3 -c "import json,sys; s=json.loads(open(sys.argv[1]).read().strip()); print('legacy' if 'subject_binding' not in s['predicate'] else 'new')" "${TMP_DIR}/att-legacy.intoto.jsonl" 2>/dev/null || echo unknown)"
+    rc_u="$(verify_with out-legacy.json att-legacy.intoto.jsonl vh7-c-untouched.json)"
+    ab_u="$(status "${TMP_DIR}/vh7-c-untouched.json" attestation_binding)"
+    patch_signature "${TMP_DIR}/out-legacy.json" "${TMP_DIR}/out-legacy-patched.json"
+    rc_p="$(verify_with out-legacy-patched.json att-legacy.intoto.jsonl vh7-c-patched.json)"
+    ab_p="$(status "${TMP_DIR}/vh7-c-patched.json" attestation_binding)"
+    overall_p="$(status "${TMP_DIR}/vh7-c-patched.json" overall)"
+    if [ "${old_shape}" = "legacy" ] && [ "${ab_u}" = "ok" ] && [ "${ab_p}" = "skip" ] \
+       && [ "${overall_p}" = "PARTIAL" ] && [ "${rc_p}" = "2" ]; then
+      t7c="PASS"; t7cnote="0.27.0 statement: bound on untouched bytes (exit ${rc_u}), unbindable once patched, PARTIAL, exit 2"
+    else
+      t7cnote="shape=${old_shape}, untouched binding=${ab_u}, patched binding=${ab_p}, overall=${overall_p}, exit=${rc_p} (want legacy/ok/skip/PARTIAL/2)"
+    fi
+  fi
+fi
+if [ "${t7c}" = "PASS" ]; then ok "${t7cnote}"; else fail "${t7cnote}"; fi
+record "7c. 0.27.0 statement flagged" "${t7c}" "${t7cnote}"
+
+# === Sub-test 8: an official period the archive does not reach is refused ===
+# Rotation prunes the archive by file count and the hash chain restarts with
+# each file, so a busy daemon can lose a quarter's first weeks without a trace.
+# From 0.28.0 official disclose refuses a period whose first day precedes the
+# oldest archived window, and internal disclose warns. The fixtures start on
+# 2026-06-05, well inside the declared quarter.
+step "8. official refuses a quarter the archive does not reach back to"
+rm -f "${TMP_DIR}/out-gap-official.json" "${TMP_DIR}/out-gap-internal.json"
+in_image disclose --intent official --confidentiality public "${PERIOD_ARGS[@]}" \
+  --input /workdir/reports-thr5.ndjson --output /workdir/out-gap-official.json \
+  --org-config /workdir/org-config.toml > /dev/null 2> "${TMP_DIR}/gap-official.err" \
+  && GAP_OFFICIAL_RC=0 || GAP_OFFICIAL_RC=$?
+in_image disclose --intent internal --confidentiality internal "${PERIOD_ARGS[@]}" \
+  --input /workdir/reports-thr5.ndjson --output /workdir/out-gap-internal.json \
+  --org-config /workdir/org-config.toml > /dev/null 2> "${TMP_DIR}/gap-internal.err" \
+  && GAP_INTERNAL_RC=0 || GAP_INTERNAL_RC=$?
+GAP_MESSAGE="the archive starts on 2026-06-05, after the period's first day 2026-04-01"
+if [ "${GAP_OFFICIAL_RC}" = "2" ] && [ ! -e "${TMP_DIR}/out-gap-official.json" ] \
+   && grep -q "Error: ${GAP_MESSAGE}" "${TMP_DIR}/gap-official.err" \
+   && [ "${GAP_INTERNAL_RC}" = "0" ] && [ -s "${TMP_DIR}/out-gap-internal.json" ] \
+   && grep -q "Warning: ${GAP_MESSAGE}" "${TMP_DIR}/gap-internal.err"; then
+  note="official exit 2 with no report, internal exit 0 with the warning"
+  ok "${note}"; record "8. archive must reach the period start" PASS "${note}"
+else
+  note="official rc=${GAP_OFFICIAL_RC}, internal rc=${GAP_INTERNAL_RC}, see ${TMP_DIR}/gap-*.err"
+  fail "${note}"; record "8. archive must reach the period start" FAIL "${note}"
 fi
 
 # === Aggregate verdict + report ===
