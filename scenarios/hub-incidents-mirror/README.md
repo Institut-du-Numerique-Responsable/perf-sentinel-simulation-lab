@@ -1,6 +1,7 @@
 # hub-incidents-mirror
 
-The daemon-to-Hub incident chain, end to end, over the shared lab pair.
+The daemon-to-Hub incident chain, end to end, over the shared lab pair, with
+one leg on an isolated pair of its own.
 
 ## Why it exists
 
@@ -45,11 +46,20 @@ overwrite a full one, would ship green in both repositories.
    reachable, keeps a null `unreachable_since_ms` and goes on reporting its
    findings. This is the invariant the reader was built around: an incidents
    read files its own outcome and never touches `source_state`.
-5. **The copy outlives the ring, and a poorer capture never replaces it.**
-   Restarting the daemon empties its ring, and the Hub still serves the record
-   with its findings. Reposting the same envelope makes the restarted daemon
-   capture the same id against a ring that no longer reaches the window, and
-   the Hub keeps the richer document.
+5. **The shared daemon replays its archive.** Since perf-sentinel 0.24.0 the
+   daemon reloads its incident ring from `[daemon.incidents] archive_path` at
+   startup, and the lab keeps that file on the `perf-sentinel-acks` PVC. After
+   a restart the shared daemon lists the incident again with the signatures it
+   froze.
+6. **The copy outlives the ring, and a poorer capture never replaces it.** On
+   an isolated daemon and Hub with no `archive_path`, restarting the daemon
+   empties its ring, and the Hub still serves the record with its findings.
+   Reposting the same envelope makes the restarted daemon capture the same id
+   against a ring that no longer reaches the window, and the Hub keeps the
+   richer document. Both verdicts also require the source's `incidents_state`
+   to be `ok` with an `incidents_read_ms` past the restart or the repost, and
+   the record's `last_seen` past the repost, since a refresh answers 200 even
+   when its read failed.
 
 ## The two keys
 
@@ -74,6 +84,19 @@ Leg 5 restarts the shared daemon, which several scenarios already do
 ([`cold-start-edge-cases`](../cold-start-edge-cases),
 [`failure-mode-daemon-restart`](../failure-mode-daemon-restart)). It leaves the
 findings ring empty behind it, the same state a plain `make up` starts from.
+The incident ring comes back from the archive, which is why that restart can
+no longer prove the Hub's copy outlives it.
+
+## The isolated pair
+
+Leg 6 needs a daemon that really loses its incidents on a restart. It copies
+the shared daemon and Hub images into a pair of its own in the
+`hub-incidents-mirror` namespace, in the shape of
+[`hub-source-reachability`](../hub-source-reachability): `[daemon.incidents]`
+enabled with no `archive_path`, a 5-second `trace_ttl_ms` so the settle pass is
+short, the lab's two keys copied into a local Secret, and a tracegen Job aimed
+at that daemon. The trap deletes the namespace on every exit path; set
+`KEEP_NAMESPACE=yes` to keep it for debugging.
 
 ## What it does not assert
 
@@ -85,7 +108,7 @@ findings ring empty behind it, the same state a plain `make up` starts from.
 - **A second daemon.** One incident id held by two sources, the per-source copy
   it implies, and the single-incident route's tie-break on the richest capture
   are untested. The richest-copy rule is proven within one source only, by
-  making that source re-capture the same id after losing its ring.
+  making the isolated daemon re-capture the same id after losing its ring.
 - **That the `source_id` filter narrows anything.** The lab configures one
   source, so the filter can only ever return everything. Its refusal of an
   unknown id is what this scenario proves, not its selectivity.
@@ -105,10 +128,10 @@ findings ring empty behind it, the same state a plain `make up` starts from.
   That a real Alertmanager receiver posts exactly this is a deployment
   question, and the intake's refusal counters are the only signal when it does
   not, which `incident-window-capture` covers.
-- **The daemon's own archive.** `/var/lib/perf-sentinel/incidents.ndjson` is
-  written and survives on the PVC, but the daemon does not replay it at
-  startup, so after leg 5 the Hub is the only surface that still serves the
-  record. Reading the archive back is not part of this scenario.
+- **The archive's own rules.** Leg 5 proves only that a restart brings the
+  record back. The last-record-wins replay and the tail-only read of a large
+  file are the daemon's own tests' subject, the guards on the path are
+  [`incident-window-capture`](../incident-window-capture)'s.
 
 ## Running it
 
