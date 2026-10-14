@@ -13,8 +13,11 @@ Sub-commands, each reading one or two JSON page dumps:
   suggestion <page> <type>         the suggestion of the first row of that type
   compare <page-a> <page-b>        the fold A/B: the same rows carrying the
                                    same group metadata, batch by batch, in the
-                                   same batch order. Prints the first
-                                   mismatches and exits 1 on any difference.
+                                   same batch order, a batch split across two
+                                   analysis ticks aligned first. Prints the
+                                   first mismatches and exits 1 on any
+                                   difference.
+  selftest                         checks the batch alignment on fixtures
 
 `compare` deliberately ignores `stored_at_ms` and `first_seen_ms`: they date
 the reception, and two daemons fed the same corpus receive it at different
@@ -24,6 +27,7 @@ instants. Everything the fold itself decides is compared, the representative
 
 import json
 import sys
+from collections import Counter
 
 # The fold's own output: the representative it picked and the metadata it
 # accumulated. A field added to the API response is not compared until it is
@@ -107,6 +111,37 @@ def batches(rows):
     return out
 
 
+def align(ba, bb):
+    """Pair the two batch sequences on their common coarsening.
+
+    Which analysis tick a trace lands in depends on when it arrives, so the
+    same release can split one batch across two ticks on one daemon and not
+    on the other. Consecutive batches are merged on whichever side holds
+    fewer rows until the two groups hold the same rows. A group equal in
+    size but not in rows fails, and batch order is kept, so a row that
+    moved to another place in the newest-first sequence still fails. Returns (groups, problem), problem
+    being None or the (only_a, only_b) multisets of the unmatched tail.
+    """
+    groups, i, j = 0, 0, 0
+    ga, gb = Counter(), Counter()
+    while i < len(ba) or j < len(bb):
+        na, nb = sum(ga.values()), sum(gb.values())
+        if na and na == nb:
+            break  # same size, different rows: no further merge can fix it
+        if i < len(ba) and (na <= nb or j == len(bb)):
+            ga.update(ba[i][1])
+            i += 1
+        if j < len(bb) and (nb <= na or i == len(ba)):
+            gb.update(bb[j][1])
+            j += 1
+        if ga == gb:
+            groups += 1
+            ga, gb = Counter(), Counter()
+    if ga or gb:
+        return groups, (ga - gb, gb - ga)
+    return groups, None
+
+
 def cmd_compare(argv):
     a, b = load(argv[0]), load(argv[1])
     if len(a) != len(b):
@@ -124,28 +159,43 @@ def cmd_compare(argv):
             print("%s: the listing is not newest-first on stored_at_ms" % name)
             return 1
 
-    if len(ba) != len(bb):
-        print("batch count differs: %d vs %d" % (len(ba), len(bb)))
-        return 1
-    problems = []
-    for i, ((_, rows_a), (_, rows_b)) in enumerate(zip(ba, bb)):
-        if set(rows_a) != set(rows_b):
-            problems.append((i, set(rows_a) - set(rows_b), set(rows_b) - set(rows_a)))
-    if not problems:
+    groups, problem = align(ba, bb)
+    if problem is None:
+        if len(ba) != len(bb):
+            print("batches split differently across analysis ticks "
+                  "(%d vs %d), aligned into %d groups holding the same rows"
+                  % (len(ba), len(bb), groups))
         if ka != kb:
             moved = sum(1 for x, y in zip(ka, kb) if x != y)
             print("%d row(s) sit in a different order inside their batch, "
                   "which the listing does not order; every batch holds the "
                   "same rows" % moved)
         return 0
-    print("%d of %d batches hold different rows" % (len(problems), len(ba)))
-    for i, only_a, only_b in problems[:3]:
-        print("  batch %d" % i)
-        for row in list(only_a)[:2]:
-            print("    baseline only: %s" % (row,))
-        for row in list(only_b)[:2]:
-            print("    under test only: %s" % (row,))
+    only_a, only_b = problem
+    print("the batches stop matching after %d aligned group(s) of %d/%d "
+          "batches" % (groups, len(ba), len(bb)))
+    for row in list(only_a)[:3]:
+        print("    baseline only: %s" % (row,))
+    for row in list(only_b)[:3]:
+        print("    under test only: %s" % (row,))
     return 1
+
+
+def cmd_selftest(_argv):
+    """Self-check of align(): a split batch passes, a change fails."""
+
+    def page(*sizes_and_rows):
+        return [(n, list(rows)) for n, rows in enumerate(sizes_and_rows)]
+
+    ref = page("ab", "cde", "f")
+    assert align(ref, page("ab", "c", "de", "f"))[1] is None, "split batch"
+    assert align(ref, page("abcde", "f"))[1] is None, "merged batches"
+    assert align(ref, page("ba", "edc", "f"))[1] is None, "order inside a batch"
+    assert align(ref, page("ab", "cdX", "f"))[1] is not None, "moved representative"
+    assert align(ref, page("ab", "cdf", "e"))[1] is not None, "row across batches"
+    assert align(ref, page("ab", "cde"))[1] is not None, "missing tail"
+    print("fold_compare self-check: ok")
+    return 0
 
 
 COMMANDS = {
@@ -155,6 +205,7 @@ COMMANDS = {
     "groupings": cmd_groupings,
     "suggestion": cmd_suggestion,
     "compare": cmd_compare,
+    "selftest": cmd_selftest,
 }
 
 if __name__ == "__main__":

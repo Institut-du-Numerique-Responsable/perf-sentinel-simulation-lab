@@ -38,13 +38,14 @@ reads the API's filters; `grouping-metrics-split` pins the same value on
 | A | `?grouping=<value>` partitions the listing exactly, and the values it accepts are the ones `label_values(perf_sentinel_findings_total, grouping)` offers, with no conversion. |
 | B | An empty, blank or `+` value is no filter, on all four string filters, and a padded value is trimmed. |
 | C | `offset` walks the folded listing with no gap and no overlap, past the end is an empty `200`, and a page shortened by the ack screen is not the last page. |
-| D | The rewritten fold returns exactly what the published release returns: same rows, same order, same representative, same counts. |
+| D | The rewritten fold returns exactly what the latest release returns: same rows, same order, same representative, same counts. |
 | E | A `serialized_calls` suggestion names at most three distinct templates, each cut at 120 characters, ends in ` -> ...` when more follows, and keeps the block's real count, total and parallel estimate. |
 
-## Why three legs are A/B runs
+## Why every leg is an A/B run
 
-Legs A, B, C and E each carry a counter-proof against
-`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`, and leg D *is* one.
+Legs A, B, C and E each carry a counter-proof against the before-the-feature
+baseline, `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`,
+and leg D *is* a comparison, against the latest release.
 
 That is not belt and braces. A leg that passes on both builds proves nothing
 about the new one, and this lab has shipped that exact mistake: the 0.20.2
@@ -64,6 +65,15 @@ counter-proofs make the failure mode loud instead. Concretely:
   the new one, which is what tells "the bound works" from "this fixture never
   produced a long sentence".
 
+Leg D does not compare against 0.20.2. 0.26.2 deliberately changed which
+instance represents a tie: a slow-trace finding keeps the smallest trace id,
+and every input yields one finding order. From 0.26.2 on, every build differs
+from 0.20.2 on a few representatives without losing a row or a count, so
+against 0.20.2 the leg fails on a change that is not a fold regression. It
+runs a third daemon, on `FOLD_BASELINE_IMAGE`, fed the same corpus, and holds
+the fold to the latest release instead. The other four legs keep 0.20.2: they
+need a build without the 0.21.0 parameters, and the latest release has them.
+
 Leg D excludes `stored_at_ms` and `first_seen_ms`, which date the reception
 and differ between two daemons fed the same corpus at different instants.
 Everything the fold itself decides is compared, the representative's
@@ -78,9 +88,15 @@ reordering the contract never promised, which is exactly what happened on the
 first full pass: two adjacent rows sharing a stamp had swapped, on a leg that
 had passed in isolation minutes earlier. So the sequence of batches is
 compared in order, each side is separately checked to be newest-first, and the
-rows inside a batch are compared as a set. A row that moves to a *different*
-batch, a changed `seen_count` and a changed representative are all still
-caught.
+rows inside a batch are compared as a set. Which analysis tick a trace lands
+in also depends on when it arrives, so one daemon can split a batch across two
+ticks that the other folds as one (a 27-row batch read as 14 + 13 on one run).
+Before comparing, consecutive batches are merged on whichever side holds fewer
+rows until both sides hold the same rows, and that group is compared as a set;
+a group equal in size but not in rows fails at once. A row that moves to a
+*different* place in the batch sequence, a changed `seen_count` and a changed
+representative are all still caught. `fold_compare.py selftest`, run by
+`make validate`, checks both halves on fixtures.
 
 The corpus is `tracegen` at a fixed seed **and a fixed `--run-nonce`**: the
 nonce is what the service names derive from, and tracegen picks a fresh one
@@ -106,8 +122,8 @@ pip install -r tools/tracegen/requirements.txt
 ```
 
 Unlike the other local-binary scenarios, this one **fails rather than skips**
-when Docker or the baseline image is missing: three of its five legs are
-comparisons, and a scenario that quietly skips them reads exactly like one
+when Docker or either baseline image is missing: every leg compares against
+one of them, and a scenario that quietly skips them reads exactly like one
 that passed.
 
 It also fails, rather than skipping, when the binary under test ignores
@@ -120,9 +136,11 @@ Knobs:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2` | the A side of every comparison, bump it with the pin in `manifests/perf-sentinel-daemon.yaml` |
+| `BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2` | the before-the-feature baseline of the counter-proofs in legs A, B, C and E; fixed, never bumped |
+| `FOLD_BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:908c9b31…` (0.26.2) | the latest release, the reference of leg D; bump it with the pin in `manifests/perf-sentinel-daemon.yaml`, same digest |
 | `FPF_DAEMON_HTTP_PORT` / `FPF_DAEMON_GRPC_PORT` | `14828` / `14827` | loopback ports of the daemon under test |
-| `FPF_BASELINE_HTTP_PORT` | `14838` | published port of the baseline container |
+| `FPF_BASELINE_HTTP_PORT` | `14838` | published port of the `BASELINE_IMAGE` container |
+| `FPF_FOLD_BASELINE_HTTP_PORT` | `14839` | published port of the `FOLD_BASELINE_IMAGE` container |
 | `FPF_SEED_A` / `FPF_SEED_B` | `4321` / `9876` | tracegen seeds, one per tenant |
 | `FPF_NONCE` | `ab` | tracegen run nonce, shared by both sides so the service names match |
 | `FPF_SERIALIZED_CALLS` | `40` | calls in leg E's sequential block |
@@ -130,8 +148,15 @@ Knobs:
 
 Report: `/tmp/scenario-findings-page-filters-report.md`.
 
-Runtime is about a minute: two daemons, four 6-to-8 second tracegen runs and
-two batch `analyze` calls.
+Runtime is about a minute: three daemons, six 6-to-8 second tracegen runs
+and two batch `analyze` calls.
+
+When a release ships, bump `FOLD_BASELINE_IMAGE` in `verify.sh` to the digest
+`manifests/perf-sentinel-daemon.yaml` pins, in the same change, with the
+version in the trailing comment. Leg D then holds the fold to what that
+release returns. A leg D failure right after a release that changed
+representatives on purpose means the pin is stale, not that the fold broke:
+check the release notes before reading it as a regression.
 
 ## Files
 

@@ -185,6 +185,7 @@ validate: ## Validate manifests, helm values, dashboards, scripts (no cluster)
 	@bash -n scenarios/incident-alerting-chain/verify.sh
 	@bash -n scenarios/grouping-metrics-split/verify.sh
 	@bash -n scenarios/findings-page-filters/verify.sh
+	@python3 scenarios/findings-page-filters/fold_compare.py selftest >/dev/null
 	@bash -n scenarios/correlation-event-time/verify.sh
 	@bash -n scenarios/slow-window-cross-batch/verify.sh
 	@python3 -m py_compile tools/tracegen/emit_at.py
@@ -485,7 +486,7 @@ verify-grouping-identity: ## 0.11 grouping identity across ingest, detection, di
 verify-grouping-metrics-split: ## 0.19.0 grouping label on the five metric families: the split, the sum invariant, the (service, grouping) pair caps and the per_grouping_labels knob (local binary, no cluster)
 	./scenarios/grouping-metrics-split/verify.sh
 
-verify-findings-page-filters: ## 0.21.0 GET /api/findings reading contract: the grouping and offset filters, an empty value as no filter, the rewritten fold and the bounded serialized_calls suggestion, each against the published release (local binary + Docker, no cluster)
+verify-findings-page-filters: ## 0.21.0 GET /api/findings reading contract: the grouping and offset filters, an empty value as no filter, the rewritten fold and the bounded serialized_calls suggestion, each against a published release (0.20.2 for the filters, the latest release for the fold) (local binary + Docker, no cluster)
 	./scenarios/findings-page-filters/verify.sh
 
 verify-correlation-event-time: ## 0.23.0 correlator pairs findings on their own timestamps: exact median lag, earlier event as source whatever the arrival order, both sides' traces open in Explain, window_minutes validated, against the published release (local binary + Docker, no cluster)

@@ -189,7 +189,7 @@ Findings produced by the standard rule omit the field.
 | [`grafana-dashboard`](#grafana-dashboard-validation)      | upstream dashboard import + audit + alerts + postgres-exporter | running daemon + Prometheus + Grafana + Postgres | PASS   |
 | [`astronomy-shop`](#astronomy-shop-capture-and-replay)    | foreign OTel auto-instrumentation + FP budget on captured demo slices | none (committed fixtures + local binary)         | PASS   |
 | [`grouping-identity`](#grouping-identity)                  | 0.11 grouping identity across ingest, detection and outputs    | local binary + Docker + Chrome                    | PASS   |
-| [`findings-page-filters`](#findings-page-filters-0210-findings-page-contract-and-its-fold) | 0.21.0 findings page filters, paging and fold, against the published release | local binary + Docker | PASS   |
+| [`findings-page-filters`](#findings-page-filters-0210-findings-page-contract-and-its-fold) | 0.21.0 findings page filters, paging and fold, against the published releases | local binary + Docker | PASS   |
 | [`correlation-event-time`](#correlation-event-time-0230-pairing-on-event-time) | 0.23.0 correlator pairing on event time, both sides' traces, against the published release | local binary + Docker | PASS   |
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
 
@@ -3035,18 +3035,29 @@ findings page.
   reading `len() < limit` as the end of the listing stops at the first
   acked row.
 - **D, the fold is unchanged.** The same corpus into a daemon on the
-  published release and one on the build under test returns the same
-  rows in the same order, with the same representative and the same
-  counts. `stored_at_ms` and `first_seen_ms` are excluded, they date
-  the reception; everything the fold decides is compared.
+  latest release (`FOLD_BASELINE_IMAGE`, the digest
+  `manifests/perf-sentinel-daemon.yaml` pins, 0.26.2 today) and one on
+  the build under test returns the same rows in the same order, with
+  the same representative and the same counts. `stored_at_ms` and
+  `first_seen_ms` are excluded, they date the reception; everything the
+  fold decides is compared. A batch one daemon splits across two
+  analysis ticks is merged back before the comparison, since the split
+  only dates the arrival. Not against 0.20.2: 0.26.2 deliberately
+  changed which instance represents a tie (smallest trace id for a slow
+  trace, one finding order per input), so every build from 0.26.2 on
+  differs from 0.20.2 on representatives with no row or count lost.
+  Bump `FOLD_BASELINE_IMAGE` with the daemon manifest pin.
 - **E, `serialized_calls`.** On a 40-call sequential block of
   four-kilobyte statements, the suggestion names at most three distinct
   templates, each cut at 120 characters, ends in ` -> ...`, and keeps
   the block's real count, total and parallel estimate.
 
-Legs A, B, C and E each carry a counter-proof against
-`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`, and leg D is one. That is the
-point of the scenario, not extra caution: 0.20.2 ignores an unknown
+Legs A, B, C and E each carry a counter-proof against the
+before-the-feature baseline,
+`ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2`, fixed
+because the latest release carries the parameters. Leg D compares
+against the latest release instead. The counter-proofs are the point of
+the scenario, not extra caution: 0.20.2 ignores an unknown
 query parameter and answers the whole listing, so with a single tenant
 leg A would read the same number on both builds and pass on either.
 `?severity=` returns nothing there and everything here, which leg B
@@ -3062,7 +3073,7 @@ fresh one per process, so two runs of the same seed differ on every
 `service` field and leg D would compare nothing else.
 
 Unlike the other local-binary scenarios this one fails, rather than
-skips, without Docker or the baseline image, and again when the binary
+skips, without Docker or either baseline image, and again when the binary
 under test ignores `?grouping=`. A release branch keeps the previous
 version in `Cargo.toml` until tag time, so `--version` cannot answer
 whether a build carries the parameter and the probe asks the daemon
