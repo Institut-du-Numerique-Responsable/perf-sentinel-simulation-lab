@@ -3368,7 +3368,8 @@ what the daemon froze and is `hub-incidents-mirror`'s.
 `make verify-hub-incidents-mirror`. Needs the cluster, `make seed-hub-local`,
 `make seed-tracegen`, `make port-forward` and the two API keys
 `scripts/bootstrap.sh` generates. Several minutes, most of it spent waiting out
-the daemon's settle pass and two rollouts.
+the daemon's settle pass, the rollouts on the shared pair and the isolated
+pair leg 6 stands up.
 
 Both product repositories test one side of this seam and neither tests the
 join. The Hub's tests drive a fake daemon answering a hand-written page, the
@@ -3420,18 +3421,29 @@ prove a poll really did succeed on the ungated routes. The restore is a verdict
 of its own, not a cleanup detail, so a silent failure cannot leave the pair
 degraded for the next scenario.
 
-**The copy outlives the ring, and a poorer capture never replaces it.**
-Restarting the daemon empties the ring and the id disappears from its listing,
-while the Hub still serves the record and its signatures. Reposting the
-identical envelope is the interesting half: the id is a hash over
-`service|kind|at_ms`, plus the namespace when the alert carries one as it does
-here, so the restarted daemon re-captures the same incident
-against a ring that no longer reaches the window and freezes zero findings.
-After the Hub's refresh debounce has passed, the original `finding_count` and
-signature set still have to be there. This is the richest-capture rule, proven
-within one source by making that source lose its own evidence.
+**The shared daemon replays its archive.** Since perf-sentinel 0.24.0 the
+daemon reloads its incident ring from `[daemon.incidents] archive_path` at
+startup, last record per id winning, and the lab keeps that file on the
+`perf-sentinel-acks` PVC. Restarting the shared daemon therefore brings the
+incident back, and the leg asserts it is listed again with the same signature
+set it froze. No other scenario asserts the replay.
 
-That last leg is why the scenario runs in the resilience block of
+**The copy outlives the ring, and a poorer capture never replaces it.** A
+daemon that replays its archive cannot lose its ring, so this leg stands up its
+own daemon and Hub in the `hub-incidents-mirror` namespace, on the shared
+images and in the shape of `hub-source-reachability`: incidents enabled with no
+`archive_path`, a 5-second `trace_ttl_ms`, a tracegen Job aimed at that daemon.
+Restarting it empties the ring and the id disappears from its listing, while
+the Hub still serves the record and its signatures. Reposting the identical
+envelope is the interesting half: the id is a hash over `service|kind|at_ms`,
+plus the namespace when the alert carries one as it does here, so the restarted
+daemon re-captures the same incident against a ring that no longer reaches the
+window and freezes zero findings. After the Hub's refresh debounce has passed,
+the original finding count and signature set still have to be there. This is
+the richest-capture rule, proven within one source by making that source lose
+its own evidence. The trap deletes the namespace on every exit path.
+
+The archive leg is why the scenario runs in the resilience block of
 `verify-all-scenarios` rather than beside the other `hub-*` gates: it leaves the
 shared daemon with an empty findings ring, the same state
 `cold-start-edge-cases` and `failure-mode-daemon-restart` leave behind.
@@ -3441,8 +3453,9 @@ Deliberately not asserted: the capture semantics themselves, which
 tie-break on the richest capture across sources stay untested), the poll path on
 its own interval, the reader's paging and its body cap, retention, which is
 `hub-retention-purge`'s subject, the IDE plugin's parse of an incident, which
-`hub-plugin-contract` does for the finding envelope, and the daemon's NDJSON
-archive, which it does not replay at startup. Alertmanager itself used to be on
+`hub-plugin-contract` does for the finding envelope, and the archive's own
+rules (the last-record-wins replay, the tail-only read, the path guards), of
+which only the restart round trip is asserted here. Alertmanager itself used to be on
 that list and no longer is: `incident-alerting-chain` runs a real one since
 0.22.0 shipped the rules and the receiver that feed this route.
 

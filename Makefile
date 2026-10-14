@@ -811,7 +811,7 @@ verify-all-scenarios: seed-tracegen ## Run all 95 scenarios sequentially (see do
 	@#   grouped with chart-prometheusrule-pdb, the only other scenario that
 	@#   touches the real chart.
 	@# - hub-incidents-mirror runs in the resilience block rather than beside
-	@#   the other hub-* gates: its last leg restarts the shared daemon and
+	@#   the other hub-* gates: its archive leg restarts the shared daemon and
 	@#   leaves an empty findings ring behind, so it sits after the hub
 	@#   scenarios that read that ring and just before cold-start-edge-cases,
 	@#   which starts from a cold daemon anyway.

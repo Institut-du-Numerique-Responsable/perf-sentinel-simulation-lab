@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# hub-incidents-mirror: the daemon-to-Hub incident chain, over the shared pair.
+# hub-incidents-mirror: the daemon-to-Hub incident chain, over the shared pair
+# and, for its last leg, an isolated one.
 #
 # perf-sentinel 0.20.0 freezes the findings of the window that preceded an
 # alert. PerfSentinelHub 0.1.6 mirrors those records into SQLite and serves
@@ -28,13 +29,18 @@
 #      the Hub knows is closed answers 400.
 #   E. Failure isolation. A refused read key marks the source's
 #      incidents_state unauthorized and says nothing about its findings.
-#   F. Retention and the richest copy. The daemon's ring dies with its pod,
-#      the Hub's copy does not, and a later poorer capture of the same id
-#      never replaces it.
+#   F. The archive replay. Since 0.24.0 the daemon reloads its ring from
+#      [daemon.incidents] archive_path at startup, and the shared daemon keeps
+#      that archive on the perf-sentinel-acks PVC, so a restart brings the
+#      incident back with the signatures it froze.
+#   G. Retention and the richest copy, on an isolated daemon and Hub in the
+#      scenario's own namespace. That daemon has no archive_path, so its ring
+#      dies with its pod, the Hub's copy does not, and a later poorer capture
+#      of the same id never replaces it.
 #
 # Re-runnable. The incident id is content-derived, so a repost is the same
-# incident, and every mutation this script makes to the shared pair is undone
-# in the trap.
+# incident, every mutation this script makes to the shared pair is undone in
+# the trap, and the trap deletes the isolated namespace.
 
 set -euo pipefail
 
@@ -67,6 +73,14 @@ LOOKBACK_MS=300000
 # ApiEndpoints.Incidents.RefreshDebounceMs. Two reads in a row have to straddle
 # it or the second one silently serves the stored copy.
 REFRESH_DEBOUNCE_S=11
+
+# Leg G's isolated pair. The shared daemon replays its archive at startup, so
+# only a daemon with no archive_path loses its ring on a restart.
+ISO_NS="${HUB_INCIDENTS_ISO_NS:-hub-incidents-mirror}"
+ISO_HUB_PORT="${HUB_INCIDENTS_ISO_HUB_PORT:-18094}"
+ISO_DAEMON_PORT="${HUB_INCIDENTS_ISO_DAEMON_PORT:-14348}"
+# Short, so the settle pass the leg waits out lands in seconds.
+ISO_TTL_MS=5000
 
 rm -rf "${TMP_DIR}"; mkdir -p "${TMP_DIR}"
 
@@ -111,6 +125,9 @@ cleanup() {
   for pid in ${PF_PIDS[@]+"${PF_PIDS[@]}"}; do
     kill "${pid}" 2>/dev/null || true
   done
+  if [ "${KEEP_NAMESPACE:-no}" != "yes" ]; then
+    kubectl delete namespace "${ISO_NS}" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT
 
@@ -216,8 +233,10 @@ command -v kubectl >/dev/null || die "kubectl not on PATH"
 command -v curl >/dev/null || die "curl not on PATH"
 command -v python3 >/dev/null || die "python3 not on PATH"
 
-WRITE_KEY_FILE="${LAB_ROOT}/.perf-sentinel-incidents.key"
-READ_KEY_FILE="${LAB_ROOT}/.perf-sentinel-read.key"
+# A worktree run points this at the checkout that owns the keys rather than copying them.
+KEY_DIR="${HUB_INCIDENTS_KEY_DIR:-${LAB_ROOT}}"
+WRITE_KEY_FILE="${KEY_DIR}/.perf-sentinel-incidents.key"
+READ_KEY_FILE="${KEY_DIR}/.perf-sentinel-read.key"
 [ -f "${WRITE_KEY_FILE}" ] || die "no incidents write key at ${WRITE_KEY_FILE}. Run: make up (scripts/bootstrap.sh generates it)"
 [ -f "${READ_KEY_FILE}" ] || die "no read key at ${READ_KEY_FILE}. Run: make up (scripts/bootstrap.sh generates it)"
 WRITE_KEY="$(cat "${WRITE_KEY_FILE}")"
@@ -412,7 +431,7 @@ else
   EXPECT_CAPTURE="partial"
 fi
 
-# Straddle the ten-second floor the way legs E and F do. A background poll that
+# Straddle the ten-second floor the way legs E and G do. A background poll that
 # just read this source makes the route skip it and answer from the store, so a
 # single refresh can serve the copy taken before the settle pass landed.
 hub_refresh || die "the Hub never read the fleet, the rest of the scenario would assert on a stale copy"
@@ -600,8 +619,12 @@ else
   record "the read key is restored" FAIL "incidents_state=${INC_STATE_BACK}"
 fi
 
-# === F. Retention and the richest copy ===
-step "5. The copy outlives the ring, and a poorer capture never replaces it"
+# === F. The archive replay ===
+step "5. The shared daemon replays its incident archive at startup"
+# The shared daemon keeps [daemon.incidents] archive_path on the
+# perf-sentinel-acks PVC, and since 0.24.0 it reloads the ring from that file
+# before it serves, last record per id winning. So a restart brings back the
+# settled record, signature for signature, rather than an empty ring.
 kubectl -n "${NS}" rollout restart deploy/perf-sentinel-daemon >/dev/null
 kubectl -n "${NS}" rollout status deploy/perf-sentinel-daemon --timeout=240s >/dev/null \
   || die "the daemon did not come back after the restart"
@@ -609,51 +632,334 @@ ensure_forward perf-sentinel-daemon "${DAEMON_PORT}" 14318 /health 90 \
   || die "the daemon's forward never came back after the restart"
 
 daemon_api GET "/api/incidents?service=${SERVICE}" "" "${READ_KEY}" >/dev/null
-RING_HOLDS="$(jqp "sum(1 for r in d if r['id'] == '${INCIDENT_ID}')" < "${TMP_DIR}/body" 2>/dev/null || echo absent)"
-hub_refresh || die "the Hub refused to re-read the fleet after the daemon restart"
-HUB_AFTER_CODE="$(hub_api GET "/api/incidents/${INCIDENT_ID}")"
-if [ "${HUB_AFTER_CODE}" = "200" ]; then
-  KEPT_COUNT="$(jqp "len(d.get('findings', []))" < "${TMP_DIR}/body")"
-  KEPT_SIGS="$(jqp "','.join(sorted(f['finding']['signature'] for f in d.get('findings', [])))" < "${TMP_DIR}/body")"
+if row_of "${TMP_DIR}/body" "${INCIDENT_ID}"; then
+  REPLAY_COUNT="$(jqp "len(d['findings'])" < "${TMP_DIR}/row.json")"
+  REPLAY_SIGS="$(jqp "','.join(sorted(f['finding']['signature'] for f in d['findings']))" < "${TMP_DIR}/row.json")"
 else
-  KEPT_COUNT="absent"
-  KEPT_SIGS="absent"
+  REPLAY_COUNT="absent"
+  REPLAY_SIGS="absent"
 fi
-if [ "${RING_HOLDS}" = "0" ] && [ "${KEPT_COUNT}" = "${D_COUNT}" ] && [ "${KEPT_SIGS}" = "${D_SIGS}" ]; then
-  ok "the daemon's ring lost the incident with its pod, the Hub still serves its ${KEPT_COUNT} finding(s)"
-  record "the copy outlives the ring" PASS "ring empty, Hub keeps ${KEPT_COUNT} finding(s)"
+if [ "${REPLAY_COUNT}" = "${D_COUNT}" ] && [ "${REPLAY_SIGS}" = "${D_SIGS}" ]; then
+  ok "the restarted daemon lists ${INCIDENT_ID} again with its ${REPLAY_COUNT} frozen finding(s)"
+  record "the shared daemon replays its archive" PASS "${REPLAY_COUNT} finding(s) back after a restart"
 else
-  fail "the restarted daemon lists the id ${RING_HOLDS} time(s), the Hub serves ${KEPT_COUNT} finding(s) against ${D_COUNT}"
-  record "the copy outlives the ring" FAIL "ring=${RING_HOLDS}, Hub=${KEPT_COUNT}"
+  fail "after the restart the daemon lists ${REPLAY_COUNT} finding(s) for ${INCIDENT_ID} against ${D_COUNT} frozen"
+  record "the shared daemon replays its archive" FAIL "replayed ${REPLAY_COUNT} vs ${D_COUNT}"
+fi
+
+# === G. Retention and the richest copy, on an isolated pair ===
+step "6. The copy outlives the ring, and a poorer capture never replaces it"
+# The shared daemon cannot lose its ring any more (leg F), so this leg stands
+# up its own daemon and Hub, in the shape of scenarios/hub-source-reachability:
+# same images, no archive_path, so a restart is a real loss of evidence.
+DAEMON_IMAGE="$(kubectl -n "${NS}" get deploy/perf-sentinel-daemon -o jsonpath='{.spec.template.spec.containers[0].image}')"
+HUB_IMAGE="$(kubectl -n "${NS}" get deploy/perf-sentinel-hub -o jsonpath='{.spec.template.spec.containers[0].image}')"
+# Cleanup deletes with --wait=false, so a rerun can land while the previous
+# namespace is still terminating. Creating into one is Forbidden, not a retry.
+for _ in $(seq 1 60); do
+  [ "$(kubectl get namespace "${ISO_NS}" -o jsonpath='{.status.phase}' 2>/dev/null)" = "Terminating" ] || break
+  sleep 2
+done
+kubectl create namespace "${ISO_NS}" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# The lab's own two keys, copied: they already satisfy the daemon's rule that
+# the read key differs from the write key.
+kubectl -n "${ISO_NS}" create secret generic api-keys \
+  --from-literal=incidents-api-key="${WRITE_KEY}" --from-literal=read-api-key="${READ_KEY}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+kubectl apply -f - >/dev/null <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: daemon-config, namespace: ${ISO_NS}}
+data:
+  config.toml: |
+    [daemon]
+    listen_address = "0.0.0.0"
+    listen_port_http = 14318
+    listen_port_grpc = 14317
+    api_enabled = true
+    trace_ttl_ms = ${ISO_TTL_MS}
+    environment = "staging"
+
+    [daemon.ack]
+    enabled = false
+
+    # No archive_path: the ring is the only copy, and it dies with the pod.
+    [daemon.incidents]
+    enabled = true
+    lookback_ms = ${LOOKBACK_MS}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: daemon, namespace: ${ISO_NS}}
+spec:
+  replicas: 1
+  # Recreate, so the old pod is gone before the new one serves and the ring
+  # read after the restart cannot come from the pod that held the incident.
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: daemon}}
+  template:
+    metadata: {labels: {app: daemon}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: perf-sentinel
+          image: ${DAEMON_IMAGE}
+          args: [watch, --config, /etc/perf-sentinel/config.toml]
+          ports: [{name: http, containerPort: 14318}]
+          env:
+            - name: PERF_SENTINEL_INCIDENTS_API_KEY
+              valueFrom: {secretKeyRef: {name: api-keys, key: incidents-api-key}}
+            - name: PERF_SENTINEL_READ_API_KEY
+              valueFrom: {secretKeyRef: {name: api-keys, key: read-api-key}}
+          volumeMounts:
+            - {name: config, mountPath: /etc/perf-sentinel, readOnly: true}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 2
+      volumes:
+        - name: config
+          configMap: {name: daemon-config}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: daemon, namespace: ${ISO_NS}}
+spec:
+  selector: {app: daemon}
+  ports: [{name: http, port: 14318, targetPort: http}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: hub-config, namespace: ${ISO_NS}}
+data:
+  appsettings.Production.json: |
+    {"Hub": {
+      "DatabasePath": "/data/hub.db",
+      "PollInterval": "00:01:00",
+      "HttpTimeout": "00:00:05",
+      "Retention": "180.00:00:00",
+      "ResolutionGrace": "01:00:00",
+      "MaxReadLimit": 10000,
+      "Sources": [{
+        "Id": "${SOURCE_ID}", "Name": "isolated lab daemon", "Environment": "${ENVIRONMENT}",
+        "BaseUrl": "http://daemon.${ISO_NS}.svc.cluster.local:14318",
+        "AuthHeaderName": "X-API-Key"
+      }]
+    }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hub, namespace: ${ISO_NS}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: hub}}
+  template:
+    metadata: {labels: {app: hub}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        runAsGroup: 1654
+        fsGroup: 1654
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: hub
+          image: ${HUB_IMAGE}
+          imagePullPolicy: Never
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: Hub__Sources__0__AuthHeaderValue
+              valueFrom: {secretKeyRef: {name: api-keys, key: read-api-key}}
+          volumeMounts:
+            - {name: config, mountPath: /app/appsettings.Production.json, subPath: appsettings.Production.json, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 2
+      volumes:
+        - name: config
+          configMap: {name: hub-config}
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: hub, namespace: ${ISO_NS}}
+spec:
+  selector: {app: hub}
+  ports: [{name: http, port: 8080, targetPort: http}]
+EOF
+kubectl -n "${ISO_NS}" rollout status deploy/daemon --timeout=180s >/dev/null \
+  || die "the isolated daemon did not become ready: $(kubectl -n "${ISO_NS}" logs deploy/daemon --tail=20 2>&1)"
+kubectl -n "${ISO_NS}" rollout status deploy/hub --timeout=180s >/dev/null \
+  || die "the isolated Hub did not become ready: $(kubectl -n "${ISO_NS}" logs deploy/hub --tail=20 2>&1)"
+
+# A forward of our own, never reused: its pid is what lets the daemon restart
+# below drop it, since a forward to a deleted pod dies without exiting.
+iso_forward() {  # $1 = service, $2 = local port, $3 = remote port, $4 = probe path
+  local i
+  kubectl -n "${ISO_NS}" port-forward "svc/$1" "$2:$3" >"${TMP_DIR}/pf-iso-$1.log" 2>&1 &
+  LAST_PF="$!"
+  PF_PIDS+=("${LAST_PF}")
+  disown "${LAST_PF}" 2>/dev/null || true
+  for i in $(seq 1 40); do
+    curl -sf "http://127.0.0.1:$2$4" >/dev/null 2>&1 && return 0
+    sleep 0.5
+  done
+  return 1
+}
+iso_forward hub "${ISO_HUB_PORT}" 8080 /health/ready || die "the isolated Hub never answered on ${ISO_HUB_PORT}"
+iso_forward daemon "${ISO_DAEMON_PORT}" 14318 /health || die "the isolated daemon never answered on ${ISO_DAEMON_PORT}"
+ISO_DAEMON_PF="${LAST_PF}"
+# Every helper above reads these two, so the rest of the leg talks to the pair.
+HUB_PORT="${ISO_HUB_PORT}"
+DAEMON_PORT="${ISO_DAEMON_PORT}"
+ok "isolated pair in ${ISO_NS}: daemon ${DAEMON_IMAGE} without an archive, Hub ${HUB_IMAGE}"
+
+iso_findings() {
+  daemon_api GET "/api/findings?service=${SERVICE}" "" "${READ_KEY}" >/dev/null
+  jqp 'len(d)' < "${TMP_DIR}/body" 2>/dev/null || echo 0
+}
+kubectl apply -f - >/dev/null <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata: {name: seed, namespace: ${ISO_NS}}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels: {app: tracegen}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: tracegen
+          image: lab-tracegen:1
+          imagePullPolicy: Never
+          args:
+            - "--endpoint=http://daemon.${ISO_NS}.svc.cluster.local:14318"
+            - "--protocol=http-pb"
+            - "--services=1"
+            - "--service-prefix=incmirror"
+            - "--run-nonce=probe"
+            - "--tps=25"
+            - "--duration=15"
+            - "--mix=n_plus_one:100"
+EOF
+kubectl -n "${ISO_NS}" wait --for=condition=complete job/seed --timeout=120s >/dev/null 2>&1 \
+  || fail "the tracegen job did not complete: $(kubectl -n "${ISO_NS}" logs job/seed --tail=5 2>&1)"
+ISO_SEEDED=0
+for _ in $(seq 1 30); do
+  ISO_SEEDED="$(iso_findings)"
+  [ "${ISO_SEEDED}" != "0" ] && break
+  sleep 2
+done
+[ "${ISO_SEEDED}" -gt 0 ] 2>/dev/null || die "the isolated daemon holds no finding for ${SERVICE}"
+ok "${ISO_SEEDED} finding(s) in the isolated ring for ${SERVICE}"
+
+ISO_AT_MS="$(now_ms)"
+ISO_STARTS="$(rfc3339 "${ISO_AT_MS}")"
+ISO_ALERT="$(alert_body "${SERVICE}" oom_kill "${ALERT_NS}" "${ISO_STARTS}" "container memory limit reached")"
+ISO_INTAKE="$(daemon_api POST /api/incidents "${ISO_ALERT}" "${WRITE_KEY}")"
+[ "${ISO_INTAKE}" = "200" ] || die "the isolated daemon refused the alert with HTTP ${ISO_INTAKE}: $(cat "${TMP_DIR}/body")"
+# Same settle wait as leg C, at this daemon's ttl.
+sleep "$(python3 -c "import time; print(max(0.0, (${ISO_AT_MS} + 3 * ${ISO_TTL_MS} + 5000) / 1000 - time.time()))")"
+daemon_api GET "/api/incidents?service=${SERVICE}" "" "${READ_KEY}" >/dev/null
+ISO_ID="$(jqp "next((r['id'] for r in d if r['at_ms'] == ${ISO_AT_MS}), 'absent')" < "${TMP_DIR}/body")"
+[ "${ISO_ID}" != "absent" ] || die "the isolated daemon lists no incident at at_ms=${ISO_AT_MS}"
+row_of "${TMP_DIR}/body" "${ISO_ID}" || die "the isolated incident vanished between two reads"
+ISO_COUNT="$(jqp "len(d['findings'])" < "${TMP_DIR}/row.json")"
+ISO_SIGS="$(jqp "','.join(sorted(f['finding']['signature'] for f in d['findings']))" < "${TMP_DIR}/row.json")"
+[ "${ISO_COUNT}" -ge 1 ] || die "the isolated incident froze no finding, there would be no richer copy to keep"
+
+hub_signatures() {  # prints "<count> <signatures>" for $1 on the Hub, or "absent absent"
+  if [ "$(hub_api GET "/api/incidents/$1")" = "200" ]; then
+    jqp "str(len(d.get('findings', []))) + ' ' + ','.join(sorted(f['finding']['signature'] for f in d.get('findings', [])))" < "${TMP_DIR}/body"
+  else
+    echo "absent absent"
+  fi
+}
+# Straddle the debounce like leg C: the Hub's startup poll may just have read
+# this source.
+hub_refresh || die "the isolated Hub never read its daemon"
+sleep "${REFRESH_DEBOUNCE_S}"
+hub_refresh || die "the isolated Hub never read its daemon"
+ISO_HUB="$(hub_signatures "${ISO_ID}")"
+[ "${ISO_HUB}" = "${ISO_COUNT} ${ISO_SIGS}" ] \
+  || die "the isolated Hub holds '${ISO_HUB}' before the restart, against the daemon's ${ISO_COUNT} finding(s)"
+ok "incident ${ISO_ID}: ${ISO_COUNT} finding(s) frozen and mirrored"
+
+# A refresh answers 200 with the stored listing even when its read of the
+# daemon failed, so each verdict below also proves the Hub read the daemon
+# after the event: without that, a failed read keeps the copy and passes.
+iso_read_since() {  # $1 = epoch ms the Hub's last incidents read must not predate
+  hub_source_field "'ok' if d.get('incidents_state') == 'ok' and (d.get('incidents_read_ms') or 0) >= $1 else 'state=%s read_ms=%s' % (d.get('incidents_state'), d.get('incidents_read_ms'))"
+}
+RESTART_AT_MS="$(now_ms)"
+kill "${ISO_DAEMON_PF}" 2>/dev/null || true
+kubectl -n "${ISO_NS}" rollout restart deploy/daemon >/dev/null
+kubectl -n "${ISO_NS}" rollout status deploy/daemon --timeout=180s >/dev/null \
+  || die "the isolated daemon did not come back after the restart"
+iso_forward daemon "${ISO_DAEMON_PORT}" 14318 /health || die "the isolated daemon's forward never came back"
+
+daemon_api GET "/api/incidents?service=${SERVICE}" "" "${READ_KEY}" >/dev/null
+RING_HOLDS="$(jqp "sum(1 for r in d if r['id'] == '${ISO_ID}')" < "${TMP_DIR}/body" 2>/dev/null || echo absent)"
+# Past the debounce, so this refresh really reads the emptied daemon.
+sleep "${REFRESH_DEBOUNCE_S}"
+hub_refresh || die "the isolated Hub refused to re-read its daemon after the restart"
+KEPT="$(hub_signatures "${ISO_ID}")"
+READ_AFTER_RESTART="$(iso_read_since "${RESTART_AT_MS}")"
+if [ "${RING_HOLDS}" = "0" ] && [ "${KEPT}" = "${ISO_COUNT} ${ISO_SIGS}" ] && [ "${READ_AFTER_RESTART}" = "ok" ]; then
+  ok "the daemon's ring lost the incident with its pod, the Hub still serves its ${ISO_COUNT} finding(s)"
+  record "the copy outlives the ring" PASS "ring empty, Hub keeps ${ISO_COUNT} finding(s)"
+else
+  fail "the restarted daemon lists the id ${RING_HOLDS} time(s), the Hub serves '${KEPT%% *}' finding(s) against ${ISO_COUNT}, its read after the restart: ${READ_AFTER_RESTART}"
+  record "the copy outlives the ring" FAIL "ring=${RING_HOLDS}, Hub=${KEPT%% *}, read=${READ_AFTER_RESTART}"
 fi
 
 # The same envelope again. The id is a hash over service, kind, at_ms and the
-# namespace when the alert carries one, which it does here, so
-# the restarted daemon captures the SAME incident against a ring that no longer
-# reaches back to the window: a real re-capture after an outage, and the poorest
-# one there is.
-POOR_CODE="$(daemon_api POST /api/incidents \
-  "$(alert_body "${SERVICE}" oom_kill "${ALERT_NS}" "${STARTS}" "container memory limit reached")" \
-  "${WRITE_KEY}")"
+# namespace when the alert carries one, which it does here, so the restarted
+# daemon captures the SAME incident against a ring that no longer reaches back
+# to the window: a real re-capture after an outage, and the poorest one there
+# is.
+REPOST_AT_MS="$(now_ms)"
+POOR_CODE="$(daemon_api POST /api/incidents "${ISO_ALERT}" "${WRITE_KEY}")"
 daemon_api GET "/api/incidents?service=${SERVICE}" "" "${READ_KEY}" >/dev/null
-POOR_COUNT="$(jqp "next((len(r['findings']) for r in d if r['id'] == '${INCIDENT_ID}'), 'absent')" < "${TMP_DIR}/body")"
+POOR_COUNT="$(jqp "next((len(r['findings']) for r in d if r['id'] == '${ISO_ID}'), 'absent')" < "${TMP_DIR}/body")"
 sleep "${REFRESH_DEBOUNCE_S}"
-hub_refresh || die "the Hub refused the refresh that would have carried the poorer capture"
-RICH_CODE="$(hub_api GET "/api/incidents/${INCIDENT_ID}")"
-if [ "${RICH_CODE}" = "200" ]; then
-  RICH_COUNT="$(jqp "len(d.get('findings', []))" < "${TMP_DIR}/body")"
-  RICH_SIGS="$(jqp "','.join(sorted(f['finding']['signature'] for f in d.get('findings', [])))" < "${TMP_DIR}/body")"
+hub_refresh || die "the isolated Hub refused the refresh that would have carried the poorer capture"
+RICH="$(hub_signatures "${ISO_ID}")"
+# last_seen takes the read's stamp on conflict, so a fresh one proves the
+# 0-finding row went through the upsert and lost to the stored copy.
+LAST_SEEN="$(jqp "d.get('last_seen', 0)" < "${TMP_DIR}/body" 2>/dev/null || echo 0)"
+READ_AFTER_REPOST="$(iso_read_since "${REPOST_AT_MS}")"
+if [ "${POOR_CODE}" = "200" ] && [ "${POOR_COUNT}" = "0" ] && [ "${RICH}" = "${ISO_COUNT} ${ISO_SIGS}" ] \
+  && [ "${READ_AFTER_REPOST}" = "ok" ] && [ "${LAST_SEEN}" -ge "${REPOST_AT_MS}" ] 2>/dev/null; then
+  ok "the re-capture froze 0 finding(s) and the Hub kept its ${ISO_COUNT}, which is the whole point of the copy"
+  record "a poorer capture never replaces a richer one" PASS "daemon re-captured 0, Hub kept ${ISO_COUNT}"
 else
-  RICH_COUNT="absent"
-  RICH_SIGS="absent"
-fi
-if [ "${POOR_CODE}" = "200" ] && [ "${POOR_COUNT}" = "0" ] \
-   && [ "${RICH_COUNT}" = "${D_COUNT}" ] && [ "${RICH_SIGS}" = "${D_SIGS}" ]; then
-  ok "the re-capture froze 0 finding(s) and the Hub kept its ${RICH_COUNT}, which is the whole point of the copy"
-  record "a poorer capture never replaces a richer one" PASS "daemon re-captured 0, Hub kept ${RICH_COUNT}"
-else
-  fail "the re-capture was HTTP ${POOR_CODE} with ${POOR_COUNT} finding(s), the Hub now serves ${RICH_COUNT} against ${D_COUNT}"
-  record "a poorer capture never replaces a richer one" FAIL "re-capture ${POOR_COUNT}, Hub ${RICH_COUNT}"
+  fail "the re-capture was HTTP ${POOR_CODE} with ${POOR_COUNT} finding(s), the Hub now serves '${RICH%% *}' against ${ISO_COUNT}, last_seen=${LAST_SEEN} against the repost at ${REPOST_AT_MS}, read: ${READ_AFTER_REPOST}"
+  record "a poorer capture never replaces a richer one" FAIL "re-capture ${POOR_COUNT}, Hub ${RICH%% *}, last_seen=${LAST_SEEN}, read=${READ_AFTER_REPOST}"
 fi
 
 # === Report ===
@@ -665,6 +971,8 @@ fi
   echo "Hub: \`$(kubectl -n "${NS}" get deploy/perf-sentinel-hub -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)\`"
   echo
   echo "Source \`${SOURCE_ID}\` (${ENVIRONMENT}), service \`${SERVICE}\`, namespace \`${ALERT_NS}\`, incident \`${INCIDENT_ID}\`."
+  echo
+  echo "Leg 6 on an isolated pair in namespace \`${ISO_NS}\`, daemon without an archive, incident \`${ISO_ID:-none}\`."
   echo
   echo "| Sub-test | Verdict | Note |"
   echo "| --- | --- | --- |"
