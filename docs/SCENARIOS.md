@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 94 scenarios live under `scenarios/<name>/` and each one ships a
+The 95 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -195,7 +195,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 91
+`grouping-identity` is the 0.11 contract gate. The lab now ships 95
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -330,7 +330,7 @@ oversized snapshot named rather than flattened into an unreachable
 daemon, and the startup advisory that fires on the two knobs together
 but never on retained traces alone.
 
-The seven `hub-*` gates are the ecosystem tier opened in 0.15.0, the
+The eight `hub-*` gates are the ecosystem tier opened in 0.15.0, the
 first scenarios in this lab to involve anything other than
 perf-sentinel itself. `hub-ingestion` is their dependency root: the
 daemon's push export reaching PerfSentinelHub, and the envelope coming
@@ -351,7 +351,9 @@ from a running Hub, into a fixture the plugin replays in its own
 `HubContractTest`. `hub-incidents-mirror` is the 0.20.0 addition to
 the tier, the incident chain end to end, from an Alertmanager envelope
 posted to the daemon through to the frozen findings served back out of
-the Hub. It has its own section near the end of this guide.
+the Hub. It has its own section near the end of this guide. `hub-access-control`
+turns access control on, on an isolated pair, and drives every credential the
+Hub accepts through the NativeAOT image; it has its own section too.
 
 Two limits are worth stating. The Hub is not part of `make up`: the
 committed manifest pins the published image by digest, but bringing the
@@ -362,7 +364,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 79. Each validated version is recorded in
+The release gate runs all 95. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -427,7 +429,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 91 (sequential, long-running-drift is the long pole)
+# All 95 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1458,7 +1460,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 94 scenarios, in an order
+`make verify-all-scenarios` includes all 95 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3432,6 +3434,89 @@ its own interval, the reader's paging and its body cap, retention, which is
 archive, which it does not replay at startup. Alertmanager itself used to be on
 that list and no longer is: `incident-alerting-chain` runs a real one since
 0.22.0 shipped the rules and the receiver that feed this route.
+
+## hub-access-control (Hub access control, sign-in and tokens)
+
+`make verify-hub-access-control`. Needs the cluster, `make seed-daemon-local`,
+`make seed-hub-local` (the Hub image must also be in local docker), `make
+seed-tracegen` and a local `perf-sentinel` with `login`, `logout` and `hub`
+(`cargo build --release`). About two minutes.
+
+The Hub's tests drive access control through TestServer, with a fake daemon
+and no real Kestrel. What only the shipped image shows is the subject of this
+scenario: the OAuth and cookie handlers under NativeAOT, the bearer scheme over
+real Kestrel, the metrics port that stops the Hub when it is not bound, the
+daemon's read gate as a polling Hub sees it, and the token file the real CLI
+writes for the JetBrains plugin to read.
+
+**An isolated pair, with its own traffic.** As in `hub-source-reachability`,
+the zero-trust policy admits a polling Hub only from its own namespace, so the
+scenario stands up a daemon and a Hub in `hub-access-control`, copying both
+image pins from the shared deployments, which stay access-off and untouched.
+The daemon runs `require_read_key` and groups on `k8s.namespace.name`. One
+tracegen Job in the namespace sends three service families: `aca-a` under the
+tenant `aca-a`, `aca-b` under `aca-b`, and `aca-shared` under both with one
+seed, so its signatures carry two values of the key a project reads. The Hub
+has one project, `a`, on `k8s.namespace.name=aca-a`, and none for `aca-b`.
+The Hub polls the daemon twice, as `keyed` with the read key and as `keyless`
+without it.
+
+**A fake identity provider, on loopback.** The Hub validator accepts `http`
+auth endpoints on loopback only, so the provider is about forty lines of
+stdlib Python in a sidecar of the Hub pod. curl plays the browser: it takes
+the state and the correlation cookie from the Hub's challenge and calls
+`/auth/callback` itself with the code the provider accepts. The callback is
+accepted over plain `http` when the correlation cookie is sent explicitly, so
+no `X-Forwarded-Proto` is needed. `hub_session` and the correlation cookie are
+`Secure`, which curl's cookie jar would never send over `http`: every cookie
+travels as an explicit `Cookie:` header.
+
+The legs, in run order:
+
+- **E, local account.** A page without a session goes to `/auth/sign-in`, the
+  API answers `401`. The sign-in page's CSP allows its inline style by
+  `sha256` hash, which is what the code sends (the Hub's API.md still says
+  `'unsafe-inline'`). A wrong password gets `403` "The name or the password is
+  wrong.", the right one a session. The admin's `/api/access` names
+  `local:ops`, lists the local account, the `aca-b` attribute in `unmatched`
+  and the `aca-shared` copy with both values in `conflicts`.
+- **A, the daemon gate.** `keyed` is reachable; `keyless` is not, with
+  `last_error_code` `http_error`, the Hub's code for any HTTP status. No
+  finding names `keyless`.
+- **B, grouping.** `grouping=aca-a` and `aca-b` each list their family plus
+  `aca-shared`, an unknown value lists nothing, and `grouping=`, `%20` (what
+  Grafana's All sends) and `+` equal the unfiltered listing.
+- **C, machine tokens.** An expired token gets `401` with
+  `WWW-Authenticate: Bearer error="invalid_token"`, a token without a grant
+  `403`. The plugin's own query reads an `aca-a` service and gets `[]` for an
+  `aca-b` one; unfiltered, the token reads `aca-a` and the conflicting
+  `aca-shared` copy, never `aca-b`. An ack is `403` "A machine token only
+  reads.", and `/api/access` reports `findings.read` alone although the role is
+  `reader`.
+- **D, the metrics port.** `/metrics` answers on the metrics port alone, and
+  `/health/ready` does not answer there. A `docker run` of the image with
+  `Hub:MetricsPort` set and the port left out of `ASPNETCORE_HTTP_PORTS` exits
+  1 with event `2002`, which TestServer never shows.
+- **F, terminal sign-in.** The real `perf-sentinel login` prints a code, the
+  admin's session verifies it (`same_network` true) and approves it, and login
+  writes `hub-token.json`: mode `0600` in a `0700` directory, exactly the keys
+  `hub_url`, `token` and `expires_at_ms` the plugin reads, a `pshub_` token.
+  `hub findings` reads `aca-a`, `/api/access` says `terminal_token` and not
+  admin although `ops` is, `logout` revokes and deletes, and the old token then
+  gets `401`. With a machine token in `PERF_SENTINEL_HUB_TOKEN`, `hub findings`
+  works and `hub ack` exits 1 on "A machine token only reads.".
+- **G, provider sign-in.** `alice` signs in: the subject is the `sub`, not the
+  email, and of her provider groups only `/teams/a`, which a grant names, is
+  kept. `bob`, outside `RequiredGroups`, and `mallory`, whose `sub` is
+  `local:ops`, get the one-line `403`; the Hub's log (event `1900`) gives each
+  reason.
+
+Deliberately not asserted: a real IdP (Keycloak mapper output and GitLab group
+shapes stay unvalidated), the Helm chart's Secret-to-env wiring (the manifest
+mimics the env names the chart produces), the 404-versus-400 scope rules,
+throttling, the token cap and `/api/tokens`, startup validation refusals,
+analyses with access on, the live report's key prompt, and the plugin's IDE UI.
+The Hub's own tests own those.
 
 ## micrometer-http-client (0.25.2, Micrometer method and status tags)
 
