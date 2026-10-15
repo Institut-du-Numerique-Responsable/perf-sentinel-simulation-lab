@@ -118,8 +118,9 @@ wiring     read the live ConfigMap key `perf-sentinel.toml`: [daemon.ack] storag
 inject     port-forward, POST the shared N+1 fixture (daemon-sigterm-drain/fixtures),
            poll /api/status until active_traces reaches 0 (bounded wait, not the flush)
 pre-read   scale to 0 (drains + frees the RWO PVC) -> busybox reader -> expect >= 1 window
-restart    scale to 1 -> ordinal 0 reattaches the same PVC by identity -> /health OK
-post-read  scale to 0 again -> busybox reader -> archive.ndjson
+restart    scale to 1 -> ordinal 0 reattaches the same PVC by identity -> /health OK,
+           then read /api/status disclosure_archive (0.29.0+ reports the day the drain closed)
+post-read  scale to 0 again -> busybox reader -> archive.ndjson and archive-daily-*.ndjson
 compare    the pre-restart bytes must still be the head of the post-restart file (prefix,
            not equality: the archive is append-only and the daemon may legitimately flush
            another window meanwhile). Guarded by pre >= 1 window, so two empty files
@@ -127,6 +128,8 @@ compare    the pre-restart bytes must still be the head of the post-restart file
 disclose   docker run -u $(id -u):$(id -g) <image> disclose --intent internal
            --input post-restart.ndjson --org-config fixtures/org-config.toml
            -> exit 0 AND the aggregate reports >= 1 window and >= 1 anti-pattern
+rollups    the same disclose over the daily rollups alone -> the same window and
+           anti-pattern counts (SKIP when the image reports no rollup horizon)
 cleanup    helm uninstall + delete the scenario namespace (also drops the PVC)
 ```
 
@@ -134,7 +137,9 @@ cleanup    helm uninstall + delete the scenario namespace (also drops the PVC)
 
 PASS when every sub-check holds: `helm-install`, `chart-provenance`,
 `configmap-wiring`, `archive-write` (>= 1 window before restart),
-`persistence` (byte-identical after restart), `disclose-roundtrip`, plus
+`persistence` (byte-identical after restart), `disclose-roundtrip`,
+`disclose-rollups` (the daily rollups alone give the window and anti-pattern
+counts the window lines give, SKIP on an image older than 0.29.0), plus
 `cosign-verify` when it can run. Checks that cannot run because an earlier step
 did not produce their input record SKIP rather than a misleading FAIL. The
 per-check table lands in `/tmp/scenario-chart-disclose-persistence-report.md`

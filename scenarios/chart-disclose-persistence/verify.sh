@@ -220,16 +220,18 @@ EOF
     return 0
   fi
 
+  # The daily rollups (0.29.0+) sit beside the archive, one file per month.
   out="$(kubectl -n "${NS}" exec "${SCENARIO}-reader" -- sh -c \
-    'if [ -f /data/archive.ndjson ]; then cat /data/archive.ndjson; fi; echo __ARCHIVE_OK__' 2>/dev/null)"
+    'if [ -f /data/archive.ndjson ]; then cat /data/archive.ndjson; fi; echo __ARCHIVE_OK__; for f in /data/archive-daily-*.ndjson; do if [ -f "$f" ]; then cat "$f"; fi; done; echo __ROLLUPS_OK__' 2>/dev/null)"
   rc=$?
   kubectl -n "${NS}" delete pod "${SCENARIO}-reader" --grace-period=1 --wait=true >/dev/null 2>&1
-  if [ "${rc}" -ne 0 ] || [ "$(printf '%s\n' "${out}" | tail -1)" != "__ARCHIVE_OK__" ]; then
+  if [ "${rc}" -ne 0 ] || [ "$(printf '%s\n' "${out}" | tail -1)" != "__ROLLUPS_OK__" ]; then
     ARCHIVE_STATUS="readfail"
     return 0
   fi
 
-  printf '%s\n' "${out}" | sed '$d' > "${out_file}"
+  printf '%s\n' "${out}" | sed '/^__ARCHIVE_OK__$/,$d' > "${out_file}"
+  printf '%s\n' "${out}" | sed '1,/^__ARCHIVE_OK__$/d;$d' > "${out_file%.ndjson}-rollups.ndjson"
   ARCHIVE_LINES="$(grep -c . "${out_file}" 2>/dev/null)"
   case "${ARCHIVE_LINES}" in ''|*[!0-9]*) ARCHIVE_LINES=0 ;; esac
   return 0
@@ -641,6 +643,7 @@ fi
 
 step "5. Scale to 1 (ordinal 0 reattaches the same PVC)"
 RESTARTED="no"
+ROLLUP_HORIZON=""
 if [ "${PRE_OK}" != "yes" ]; then
   record "persistence" "SKIP - no pre-restart archive to compare against"
 elif ! scale_to 1; then
@@ -650,6 +653,11 @@ elif ! pf_start; then
 else
   RESTARTED="yes"
   ok "pod back, /health answers"
+  # A daemon with daily rollups (0.29.0+) reloads the day the step-4 drain
+  # closed and reports it. An older image has no such field, and step 8
+  # then has nothing to compare.
+  ROLLUP_HORIZON="$(curl -fsS "http://localhost:${LOCAL_PORT}/api/status" 2>/dev/null \
+    | python3 -c 'import json,sys; print((json.load(sys.stdin).get("disclosure_archive") or {}).get("days", ""))' 2>/dev/null)"
 fi
 
 step "6. Scale to 0 again, re-read the archive and compare"
@@ -689,6 +697,9 @@ if [ "${RESTARTED}" = "yes" ]; then
 fi
 
 # === 7. feed the persisted archive to disclose ===
+# Empty until step 7 measures them, so step 8 can tell "skipped" from "zero".
+WINDOWS=""
+PATTERNS=""
 step "7. Run disclose against the restart-surviving archive"
 if [ ! -s "${TMP_DIR}/post-restart.ndjson" ]; then
   record "disclose-roundtrip" "SKIP - no post-restart archive to feed disclose"
@@ -738,6 +749,45 @@ print(w, a.get("anti_patterns_detected_count", 0), d.get("schema_version", "?"))
   else
     tail -20 "${TMP_DIR}/disclose.log"
     assert_fail "disclose-roundtrip" "disclose exited non-zero, see ${TMP_DIR}/disclose.log"
+  fi
+fi
+
+# === 8. the daily rollups alone give the same figures ===
+step "8. Run disclose against the daily rollups alone"
+if [ -z "${ROLLUP_HORIZON}" ] && [ ! -s "${TMP_DIR}/post-restart-rollups.ndjson" ]; then
+  record "disclose-rollups" "SKIP - ${IMAGE} reports no rollup horizon after the restart and wrote no rollup, it predates daily rollups"
+elif [ ! -s "${TMP_DIR}/post-restart-rollups.ndjson" ]; then
+  if [ -s "${TMP_DIR}/post-restart.ndjson" ]; then
+    assert_fail "disclose-rollups" "no daily rollup line on the PVC after a graceful drain"
+  else
+    record "disclose-rollups" "SKIP - no post-restart archive was read"
+  fi
+elif [ -z "${WINDOWS}" ]; then
+  record "disclose-rollups" "SKIP - step 7 produced no window figures to compare against"
+else
+  if ${DOCKER_ENV_PREFIX[@]+"${DOCKER_ENV_PREFIX[@]}"} docker run --rm -u "$(id -u):$(id -g)" \
+    -v "$(docker_mount_path "${TMP_DIR}"):/data" \
+    "${IMAGE}" disclose \
+    --intent internal --confidentiality internal \
+    --period-type custom --from "${FROM_DATE}" --to "${TODAY}" \
+    --input /data/post-restart-rollups.ndjson \
+    --output /data/report-rollups.json \
+    --org-config /data/org-config.toml >"${TMP_DIR}/disclose-rollups.log" 2>&1; then
+    ROLLUP_STATS="$(python3 -c '
+import json, sys
+a = json.load(open(sys.argv[1])).get("aggregate", {})
+print(a.get("runtime_windows_count", 0) + a.get("fallback_windows_count", 0), a.get("anti_patterns_detected_count", 0))
+' "${TMP_DIR}/report-rollups.json" 2>/dev/null)"
+    R_WINDOWS="$(printf '%s' "${ROLLUP_STATS}" | awk '{print $1}')"
+    R_PATTERNS="$(printf '%s' "${ROLLUP_STATS}" | awk '{print $2}')"
+    if [ "${R_WINDOWS:-x}" = "${WINDOWS}" ] && [ "${R_PATTERNS:-x}" = "${PATTERNS}" ]; then
+      assert_pass "disclose-rollups" "rollups alone give ${R_WINDOWS} window(s) and ${R_PATTERNS} anti-pattern(s), as the windows do"
+    else
+      assert_fail "disclose-rollups" "rollups give ${R_WINDOWS:-?} window(s) and ${R_PATTERNS:-?} anti-pattern(s), windows gave ${WINDOWS} and ${PATTERNS}"
+    fi
+  else
+    tail -20 "${TMP_DIR}/disclose-rollups.log"
+    assert_fail "disclose-rollups" "disclose over the rollups exited non-zero, see ${TMP_DIR}/disclose-rollups.log"
   fi
 fi
 
