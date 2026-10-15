@@ -1405,7 +1405,7 @@ make verify-output-formats-coverage  # depends on ci-shift-left having run
 ### template-gitlab-ci
 
 Validates the upstream `docs/ci-templates/gitlab-ci.yml` at the tag the
-lab fixture pins, 0.27.0 today:
+lab fixture pins, 0.29.0 today:
 
 1. Curl upstream template (fallback to local clone).
 2. Lint via GitLab CE CI Lint API (`POST /api/v4/ci/lint`).
@@ -3037,7 +3037,7 @@ findings page.
   acked row.
 - **D, the fold is unchanged.** The same corpus into a daemon on the
   latest release (`FOLD_BASELINE_IMAGE`, the digest
-  `manifests/perf-sentinel-daemon.yaml` pins, 0.27.0 today) and one on
+  `manifests/perf-sentinel-daemon.yaml` pins, 0.29.0 today) and one on
   the build under test returns the same rows in the same order, with
   the same representative and the same counts. `stored_at_ms` and
   `first_seen_ms` are excluded, they date the reception; everything the
