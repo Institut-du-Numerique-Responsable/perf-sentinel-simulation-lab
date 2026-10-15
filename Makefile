@@ -56,7 +56,7 @@ PERF_SENTINEL_LOCAL_BIN ?= $(PERF_SENTINEL_REPO_PATH)/target/release/perf-sentin
         verify-incident-window-capture verify-incident-namespace-scope \
         verify-incident-alerting-chain \
         verify-disclose-archive-family-baseline verify-diff-mutated-findings \
-        seed-hub-local verify-hub-ingestion verify-hub-incidents-mirror \
+        seed-hub-local verify-hub-ingestion verify-hub-incidents-mirror verify-hub-incidents-push \
         verify-hub-source-reachability \
         verify-hub-derived-status verify-hub-lineage-mutation \
         verify-hub-retention-purge verify-hub-plugin-contract \
@@ -160,6 +160,7 @@ validate: ## Validate manifests, helm values, dashboards, scripts (no cluster)
 	@bash -n scenarios/batch-victoria-scrape/verify.sh
 	@bash -n scenarios/hub-ingestion/verify.sh
 	@bash -n scenarios/hub-incidents-mirror/verify.sh
+	@bash -n scenarios/hub-incidents-push/verify.sh
 	@bash -n scenarios/hub-source-reachability/verify.sh
 	@bash -n scenarios/hub-derived-status/verify.sh
 	@bash -n scenarios/hub-lineage-mutation/verify.sh
@@ -633,6 +634,9 @@ verify-hub-ingestion: ## daemon -> Hub over the shared pair: envelopes stay plug
 verify-hub-incidents-mirror: ## daemon -> Hub incident chain over the shared pair: the frozen findings copied whole, the closed filters that refuse a typo, a refused read key that spares the findings, and a copy that outlives the ring
 	./scenarios/hub-incidents-mirror/verify.sh
 
+verify-hub-incidents-push: ## daemon pushes incidents: five through a ring of two reach the Hub without a poll, and a resolve carries its end
+	./scenarios/hub-incidents-push/verify.sh
+
 verify-hub-source-reachability: ## push vs poll on unreachable_since, on an isolated pair partitioned by NetworkPolicy
 	./scenarios/hub-source-reachability/verify.sh
 
@@ -818,7 +822,7 @@ verify-all-scenarios: seed-tracegen ## Run all 95 scenarios sequentially (see do
 	@# - hub-access-control runs right after the other hub-* gates: it stands up
 	@#   its own daemon and Hub in an isolated namespace and touches neither the
 	@#   shared daemon nor the shared Hub.
-	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
+	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror hub-incidents-push cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
 	  echo "==> verify-$$s"; \
 	  $(MAKE) verify-$$s || echo "$$s FAILED"; \
 	done
