@@ -41,6 +41,16 @@ CTX_DIR="$(mktemp -d)"
 trap 'rm -rf "${CTX_DIR}"' EXIT
 git -C "${HUB_REPO_PATH}" archive "${REV}" | tar -x -C "${CTX_DIR}"
 
+# The Dockerfile pins a published engine by digest. Before that engine is
+# published, HUB_ENGINE_IMAGE (a seed-daemon-local tag, which ships /perf-sentinel
+# like the release image) stands in for it, and the tag says so.
+if [ -n "${HUB_ENGINE_IMAGE:-}" ]; then
+  perl -pi -e 's|^FROM \S+ AS engine$|FROM $ENV{HUB_ENGINE_IMAGE} AS engine|' "${CTX_DIR}/Dockerfile"
+  grep -q "^FROM ${HUB_ENGINE_IMAGE} AS engine$" "${CTX_DIR}/Dockerfile" \
+    || { echo "error: no 'FROM ... AS engine' line to replace in the Hub Dockerfile" >&2; exit 1; }
+  TAG="${TAG}-engine-${HUB_ENGINE_IMAGE##*:}"
+fi
+
 echo "==> building ${TAG} from ${HUB_REPO_PATH}@${SHA} (NativeAOT, chiselled)"
 docker build -q -f "${CTX_DIR}/Dockerfile" --build-arg "VERSION=${VERSION}" -t "${TAG}" "${CTX_DIR}"
 

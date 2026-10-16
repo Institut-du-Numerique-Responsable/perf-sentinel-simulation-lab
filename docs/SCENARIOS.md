@@ -361,6 +361,10 @@ daemon forgets it: a pair active twice around a silence longer than its gap land
 episodes, and an incident posted during the second overlaps it alone. It has its own section
 too.
 
+`hub-disclosures` is the 0.31.0 and 0.7.0 addition: a CI publishes a periodic disclosure, the
+Hub checks and renders it, shares it through a link `verify-hash --url` reaches over https, refuses
+edited figures and an internal report, and signs a webhook per event. It has its own section too.
+
 Two limits are worth stating. The Hub is not part of `make up`: the
 committed manifest pins the published image by digest, but bringing the
 pair up still goes through `make seed-hub-local`, which also generates
@@ -3491,6 +3495,37 @@ Grafana panel make.
 **An incident finds the episode it overlaps.** The incident freezes 20 s back, so its window
 opens long after the first episode ended. Read back from the Hub, that window must overlap the
 second episode alone, the same read an incident's detail makes in the launcher.
+
+## hub-disclosures (0.31.0 and 0.7.0 disclosures published to the Hub)
+
+`make verify-hub-disclosures`. Needs the cluster, `make seed-hub-local` from the Hub branch
+under test (before engine 0.31.0 is published, with `HUB_ENGINE_IMAGE` set to a
+`make seed-daemon-local` tag so the Hub embeds an engine with `disclose-pdf`), `make
+seed-tracegen` for the webhook receiver's image, a local `perf-sentinel` 0.31.0 or later
+(`PERF_SENTINEL_LOCAL_BIN`, default the release build of `PERF_SENTINEL_REPO_PATH`) and
+`openssl`. About two minutes.
+
+The engine's tests prove `disclose-pdf` refuses what it must and `verify-hash` reads a PDF, the
+Hub's tests prove its routes with a fake engine. This scenario is the seam, on one isolated Hub
+with the real engine inside it.
+
+**Rendered here, verified elsewhere.** `disclose --emit-attestation` over the `disclose`
+fixtures, published with the import key: 201, the PDF rendered, the content hash and the binding
+checked by the Hub. A share link then serves the files over https, through a relay signed by a
+throwaway CA passed to `verify-hash --url` in `SSL_CERT_FILE`, since the engine fetches https
+only. The verdict is PARTIAL with the content hash and the binding OK: the lab has no Sigstore
+identity, and TRUSTED is the engine's signing workflow's to prove. `verify-hash --report` on the
+PDF the link serves gives the same.
+
+**Edited figures never land.** One figure halved under a new uuid: without a new hash the engine
+answers `content_hash_mismatch`, with the hash re-baked `binding_mismatch`, since the attestation
+names the old one. 422 both times, and the Hub still holds one disclosure. An internal report while
+`AllowInternal` is off is 422 `internal_refused`.
+
+**Signed webhooks, and a withdrawal that is final.** The receiver runs beside the Hub in its pod,
+because a webhook may be plain http to loopback only. It must get `published` with an HMAC that
+holds under the scenario's secret. A withdrawal must answer 204, turn the share link into a 404 at
+once, and send `withdrawn`, its HMAC valid too.
 
 ## hub-access-control (Hub access control, sign-in and tokens)
 
