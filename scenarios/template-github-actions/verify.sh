@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Validate the upstream github-actions.yml template at v0.29.0.
+# Validate the upstream github-actions.yml template at v0.31.0.
 #
 # 3 steps:
 #
-# 1. Fetch upstream `docs/ci-templates/github-actions.yml` at v0.29.0.
+# 1. Fetch upstream `docs/ci-templates/github-actions.yml` at v0.31.0.
 # 2. Structural lint:
 #    - YAML parses (python yaml.safe_load),
 #    - top-level keys (`name`, `on`, `permissions`, `jobs`),
@@ -17,7 +17,7 @@
 #    network, and a working Linux amd64 binary URL. SKIP gracefully.
 #
 # Optional knobs:
-#   UPSTREAM_VERSION    override version (default 0.29.0)
+#   UPSTREAM_VERSION    override version (default 0.31.0)
 #   UPSTREAM_PATH       use local copy
 #   SKIP_RUNTIME=1      skip act parse step
 
@@ -29,7 +29,7 @@ TMP_DIR="/tmp/${SCENARIO}"
 SCENARIO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAB_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 
-UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.29.0}"
+UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.31.0}"
 UPSTREAM_URL="https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/github-actions.yml"
 # rhysd/actionlint is a lightweight GHA workflow validator (no runtime,
 # no docker socket needed). nektos/act would require gh-pages, secrets,
