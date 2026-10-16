@@ -166,21 +166,13 @@
          #8676, `output_stream` on `otlp_file/development`), which only
          declarative configuration reaches: there is no OTEL_* variable for it.
          Agent 2.31.1 bundles SDK 1.65 and silently writes to stdout instead;
-         2.32.0-SNAPSHOT is the first agent with 1.66. Move this pin to 2.32.0
-         once it is tagged: Renovate's maven manager is off in this repo. -->
+         2.32.0 is the first agent with 1.66. Renovate's maven manager is off
+         in this repo, so this pin moves by hand. -->
     <profile>
       <id>otel-file</id>
       <properties>
-        <lab.otel.file.agent.version>2.32.0-SNAPSHOT</lab.otel.file.agent.version>
+        <lab.otel.file.agent.version>2.32.0</lab.otel.file.agent.version>
       </properties>
-      <repositories>
-        <repository>
-          <id>central-snapshots</id>
-          <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-          <releases><enabled>false</enabled></releases>
-          <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-      </repositories>
       <build>
         <plugins>
           <plugin>

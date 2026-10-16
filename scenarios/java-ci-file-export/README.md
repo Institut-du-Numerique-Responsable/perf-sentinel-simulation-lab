@@ -21,8 +21,7 @@ come with it:
   named by `OTEL_CONFIG_FILE`, not from any `OTEL_*` variable. Once that file is
   set, the agent ignores the `OTEL_*` variables entirely.
 - **Agent 2.32.0 or later.** Agent 2.31.1 bundles SDK 1.65. The first agent
-  with 1.66 is 2.32.0, pinned here as `2.32.0-SNAPSHOT` from the Sonatype
-  snapshot repository until it is tagged.
+  with 1.66 is 2.32.0, pinned here from Maven Central.
 
 It is **not** the OpenTelemetry Maven extension
 (`io.opentelemetry.contrib:opentelemetry-maven-extension`, 1.60.0-alpha at the
@@ -87,18 +86,16 @@ perf-sentinel analyze --ci --input target/traces.jsonl
 
 No cluster. It needs the local release binary (`cargo build --release -p
 perf-sentinel`), a JDK, Maven (or `services/mvnw`), Docker for the throwaway
-PostgreSQL on `:15443`, and network access to Maven Central and, while the pin
-is a SNAPSHOT, to `central.sonatype.com`. Ports 4317/4318 must be free,
+PostgreSQL on `:15443`, and network access to Maven Central. Ports 4317/4318
+must be free,
 because E1 claims the export needs no receiver.
 
 ```bash
 make verify-java-ci-file-export
 ```
 
-When agent 2.32.0 is tagged, move `lab.otel.file.agent.version` in the fixture
-POM from `2.32.0-SNAPSHOT` to `2.32.0` and drop the snapshot repository.
-Renovate's `maven` manager is disabled in this repository, so nobody else will
-do it.
+Renovate's `maven` manager is disabled in this repository, so
+`lab.otel.file.agent.version` in the fixture POM moves by hand.
 
 The same no-capture step also runs in real CI engines, as legs H5
 (`ci-e2e-github`), G5 (`ci-e2e-gitlab`) and J9 (`ci-e2e-jenkins`).

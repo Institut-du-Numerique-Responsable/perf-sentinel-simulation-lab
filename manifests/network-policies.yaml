@@ -1477,10 +1477,6 @@ spec:
 # is namespace-wide because job pods are unlabelled, but the only thing opened is
 # Maven Central over 443. Nothing else in gitlab-ce gains egress it did not have.
 #
-# central.sonatype.com is the snapshot repository: the otel-file profile pins
-# opentelemetry-javaagent 2.32.0-SNAPSHOT until 2.32.0 is tagged. Drop it with
-# the pin.
-#
 # Scenario that depends on it: scenarios/ci-e2e-gitlab.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -1494,7 +1490,6 @@ spec:
         - matchName: "repo.maven.apache.org"
         - matchName: "repo1.maven.org"
         - matchPattern: "*.maven.apache.org"
-        - matchName: "central.sonatype.com"
       toPorts:
         - ports:
             - port: "443"

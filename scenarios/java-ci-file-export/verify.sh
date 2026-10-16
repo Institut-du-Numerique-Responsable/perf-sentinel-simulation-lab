@@ -7,7 +7,7 @@
 # opentelemetry-java #8676) wires `output_stream: file:///...` into the
 # `otlp_file/development` exporter. Declarative configuration only
 # (OTEL_CONFIG_FILE): there is still no OTEL_* variable for it. The first agent
-# bundling that SDK is 2.32.0 (2.32.0-SNAPSHOT until it is tagged). Not the
+# bundling that SDK is 2.32.0. Not the
 # OpenTelemetry Maven extension: that one traces the build itself (mojo spans,
 # `not_io` to perf-sentinel) and still exports OTLP only.
 #
@@ -30,8 +30,7 @@
 #       fork's stdout (Corrupted channel + .dumpstream). A silent zero.
 #
 # Self-contained: no cluster. Needs the local release binary, a JDK, Maven,
-# Docker (throwaway PostgreSQL) and network access to Maven Central and to the
-# Sonatype snapshot repository while the agent pin is a SNAPSHOT.
+# Docker (throwaway PostgreSQL) and network access to Maven Central.
 set -uo pipefail
 
 SCENARIO="java-ci-file-export"
