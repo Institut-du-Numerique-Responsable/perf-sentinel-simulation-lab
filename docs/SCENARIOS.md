@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 95 scenarios live under `scenarios/<name>/` and each one ships a
+The 100 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -195,7 +195,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 95
+`grouping-identity` is the 0.11 contract gate. The lab now ships 100
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -356,6 +356,11 @@ the Hub. It has its own section near the end of this guide. `hub-access-control`
 turns access control on, on an isolated pair, and drives every credential the
 Hub accepts through the NativeAOT image; it has its own section too.
 
+`hub-correlations-push` is the 0.30.0 addition, the correlation history the Hub keeps once the
+daemon forgets it: a pair active twice around a silence longer than its gap lands as two
+episodes, and an incident posted during the second overlaps it alone. It has its own section
+too.
+
 Two limits are worth stating. The Hub is not part of `make up`: the
 committed manifest pins the published image by digest, but bringing the
 pair up still goes through `make seed-hub-local`, which also generates
@@ -365,7 +370,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 95. Each validated version is recorded in
+The release gate runs all 100. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -430,7 +435,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 95 (sequential, long-running-drift is the long pole)
+# All 100 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1461,7 +1466,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 95 scenarios, in an order
+`make verify-all-scenarios` includes all 100 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3459,6 +3464,33 @@ rules (the last-record-wins replay, the tail-only read, the path guards), of
 which only the restart round trip is asserted here. Alertmanager itself used to be on
 that list and no longer is: `incident-alerting-chain` runs a real one since
 0.22.0 shipped the rules and the receiver that feed this route.
+
+## hub-correlations-push (0.30.0 correlation episodes pushed to the Hub)
+
+`make verify-hub-correlations-push`. Needs the cluster, `make seed-daemon-local` and
+`make seed-hub-local` from the branches under test, the two API keys `scripts/bootstrap.sh`
+generates, and the Python packages of `tools/tracegen/requirements.txt`. About five minutes,
+most of it the one-minute gap the daemon waits out before it closes an episode.
+
+The daemon's correlator keeps a pair only while its counters cover the rolling window, so a
+correlation active this morning is gone by noon. The engine's tests prove the tracker cuts
+episodes, the Hub's tests prove it stores and merges them, and neither sees the other. This
+scenario is the seam: one isolated daemon and Hub, as in `hub-incidents-push`, a pair sent with
+`emit_at.py` (no shop endpoint reaches an isolated daemon), a silence past the gap, the pair
+again with an incident posted during it.
+
+**The daemon cuts, the Hub keeps.** The first burst must leave one open episode on the Hub,
+named after the side that fires first. The silence must give it an `ended_at_ms` with no
+`ended_by`, an end pushed by the daemon rather than inferred by the Hub's stale rule, which waits
+fifteen minutes more and would set `ended_by: stale`.
+
+**Active means the running one.** While the second burst runs, `active=true` must list the new
+episode and not the closed one: that is the read the launcher's "active now only" switch and a
+Grafana panel make.
+
+**An incident finds the episode it overlaps.** The incident freezes 20 s back, so its window
+opens long after the first episode ended. Read back from the Hub, that window must overlap the
+second episode alone, the same read an incident's detail makes in the launcher.
 
 ## hub-access-control (Hub access control, sign-in and tokens)
 
