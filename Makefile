@@ -519,7 +519,7 @@ verify-output-formats-coverage: ## Output formats, diff mode, signature presence
 verify-verify-hash-roundtrip: ## verify-hash CLI contract (exit codes 1/3/4 + identity-required default)
 	./scenarios/verify-hash-roundtrip/verify.sh
 
-verify-sql-backtick-redaction: ## 0.9.2 normalize: MySQL backtick ids preserved + PostgreSQL bracket/array literals masked (no leak), 0.25.5 MySQL/MariaDB double-quoted values masked
+verify-sql-backtick-redaction: ## 0.9.2 normalize: MySQL backtick ids preserved + PostgreSQL bracket/array literals masked (no leak), 0.25.5 MySQL/MariaDB double-quoted values masked, 0.31.3 backslash escapes, hex and exponent literals
 	./scenarios/sql-backtick-redaction/verify.sh
 
 verify-non-sql-datastore-drop: ## 0.9.2 ingest: redis/elasticsearch dropped on db.system across batch Jaeger/Zipkin + OTLP daemon
