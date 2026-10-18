@@ -325,7 +325,7 @@ metadata:
   labels:
     app.kubernetes.io/name: perf-sentinel-daemon
     app.kubernetes.io/part-of: perf-sentinel-lab
-    app.kubernetes.io/version: "0.31.2"
+    app.kubernetes.io/version: "0.31.3"
 spec:
   replicas: 1
   strategy:
@@ -338,7 +338,7 @@ spec:
       labels:
         app.kubernetes.io/name: perf-sentinel-daemon
         app.kubernetes.io/part-of: perf-sentinel-lab
-        app.kubernetes.io/version: "0.31.2"
+        app.kubernetes.io/version: "0.31.3"
     spec:
       automountServiceAccountToken: false
       # UID 65534 matches the upstream perf-sentinel scratch image USER.
@@ -351,7 +351,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: perf-sentinel
-          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:92280db1fc165b0a34db8f4c4704c331cdc6ada1dcb93c30f2c6f9f2d8d5726f  # 0.31.2
+          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:74f285c2610d0c6856837e7d152f37dcefc4fee176288a2c1f2401ab0ed22c76  # 0.31.3
           imagePullPolicy: IfNotPresent
           args:
             - watch
