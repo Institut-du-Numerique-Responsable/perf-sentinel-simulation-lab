@@ -1,0 +1,541 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "shop-users"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "lab"
+          },
+          "spans": [
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100002",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600006000000",
+              "endTimeUnixNano": "1749297600008000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-1'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100003",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600010000000",
+              "endTimeUnixNano": "1749297600012000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-2'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100004",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600014000000",
+              "endTimeUnixNano": "1749297600016000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-3'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100005",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600018000000",
+              "endTimeUnixNano": "1749297600020000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-4'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100006",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600022000000",
+              "endTimeUnixNano": "1749297600024000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-5'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e1",
+              "spanId": "000000000e100007",
+              "parentSpanId": "000000000e100001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600026000000",
+              "endTimeUnixNano": "1749297600028000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-6'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200002",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600006000000",
+              "endTimeUnixNano": "1749297600008000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-1'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200003",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600010000000",
+              "endTimeUnixNano": "1749297600012000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-2'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200004",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600014000000",
+              "endTimeUnixNano": "1749297600016000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-3'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200005",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600018000000",
+              "endTimeUnixNano": "1749297600020000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-4'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200006",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600022000000",
+              "endTimeUnixNano": "1749297600024000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-5'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e2",
+              "spanId": "000000000e200007",
+              "parentSpanId": "000000000e200001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600026000000",
+              "endTimeUnixNano": "1749297600028000000",
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM users WHERE note = 'it\\'s secret-6'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300002",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600006000000",
+              "endTimeUnixNano": "1749297600008000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-1@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300003",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600010000000",
+              "endTimeUnixNano": "1749297600012000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-2@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300004",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600014000000",
+              "endTimeUnixNano": "1749297600016000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-3@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300005",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600018000000",
+              "endTimeUnixNano": "1749297600020000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-4@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300006",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600022000000",
+              "endTimeUnixNano": "1749297600024000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-5@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e3",
+              "spanId": "000000000e300007",
+              "parentSpanId": "000000000e300001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600026000000",
+              "endTimeUnixNano": "1749297600028000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mssql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-6@corp.test'"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400002",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600006000000",
+              "endTimeUnixNano": "1749297600008000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x1F AND v = 1.5e-3"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400003",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600010000000",
+              "endTimeUnixNano": "1749297600012000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x2F AND v = 2.5e-3"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400004",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600014000000",
+              "endTimeUnixNano": "1749297600016000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x3F AND v = 3.5e-3"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400005",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600018000000",
+              "endTimeUnixNano": "1749297600020000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x4F AND v = 4.5e-3"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400006",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600022000000",
+              "endTimeUnixNano": "1749297600024000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x5F AND v = 5.5e-3"
+                  }
+                }
+              ]
+            },
+            {
+              "traceId": "000000000000000000000000000000e4",
+              "spanId": "000000000e400007",
+              "parentSpanId": "000000000e400001",
+              "name": "SELECT",
+              "kind": 3,
+              "startTimeUnixNano": "1749297600026000000",
+              "endTimeUnixNano": "1749297600028000000",
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT * FROM metrics WHERE h = 0x6F AND v = 6.5e-3"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sql-backtick-redaction: validate the 0.9.2 and 0.25.5 normalize/sql.rs
+# sql-backtick-redaction: validate the 0.9.2, 0.25.5 and 0.31.3 normalize/sql.rs
 # changes on the local batch CLI path (no cluster, no daemon).
 #
 #   1. MySQL backtick identifiers are preserved verbatim by the normalizer,
@@ -17,6 +17,11 @@
 #      example.com appears 0 times in the JSON and SARIF output. PostgreSQL
 #      keeps `SELECT "Name" FROM "Users" WHERE "Id" = ?` verbatim. Native JSON
 #      with no engine keeps the value (documented gap, pinned).
+#   4. (0.31.3) Backslash escapes, hex and exponent literals: a `\'` inside
+#      a MySQL or engine-less string stays in its string, a SQL Server string
+#      ending on `\` ends there, and `0x1F` / `2.5e-3` are one ? each. Four
+#      traces, one N+1 each, and secret / corp.test appear 0 times in the
+#      JSON and SARIF output.
 #
 # All fixtures are committed (native SpanEvent JSON, one OTLP JSON).
 # fixtures/generate.py regenerates them (stdlib-only). Uses the local release binary built from
@@ -198,8 +203,68 @@ grep -qF 'gap-1@native.test' "${TMP_DIR}/dq-gap.json" \
   || die "gap changed: the double-quoted value no longer reaches the output (update the scenario and the docs)"
 ok "engine-less native JSON keeps \"gap-<n>@native.test\", no N+1 forms"
 
+# --- 5. backslash escapes, hex and exponent literals (0.31.3) ---------------
+# MySQL and an engine-less span read `\'` as an escaped quote, so the string
+# holds `it\'s secret-<n>` and the template keeps nothing of it. SQL Server
+# strings follow the standard, so `'C:\Temp\'` ends on its second quote and
+# the owner address after it is a string of its own. Before 0.31.3, E1 and E2
+# leaked `s secret-?` into the template and E4 split into one template per
+# value. E3 passes on 0.31.2 too: it guards against escaping a backslash on a
+# standard engine, which would leak the owner address.
+step "Backslash escapes follow the engine, hex and exponent literals collapse"
+for fmt in json sarif; do
+  "${PERF_SENTINEL_LOCAL_BIN}" analyze --input "${FIX}/literal-forms.otlp.json" --format "${fmt}" \
+    > "${TMP_DIR}/lf.${fmt}" 2>"${TMP_DIR}/lf.err" \
+    || die "analyze --format ${fmt} failed on literal-forms.otlp.json: $(tail -2 "${TMP_DIR}/lf.err")"
+done
+LF_FAILS=0
+lf_fail() { color_red "    FAIL: $*"; LF_FAILS=$((LF_FAILS + 1)); }
+LF_LINES="$(python3 - "${TMP_DIR}/lf.json" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1]))
+want = [
+    ("e1", "db.system=mysql", "SELECT * FROM users WHERE note = ?"),
+    ("e2", "no engine", "SELECT * FROM users WHERE note = ?"),
+    ("e3", "db.system=mssql", "SELECT * FROM files WHERE path = ? AND owner = ?"),
+    ("e4", "db.system=postgresql", "SELECT * FROM metrics WHERE h = ? AND v = ?"),
+]
+for suffix, engine, template in want:
+    n1 = [f["pattern"]["template"] for f in r["findings"]
+          if f.get("type") == "n_plus_one_sql" and f.get("trace_id", "").endswith(suffix)]
+    if n1 == [template]:
+        print("ok %s: one n_plus_one_sql on [%s]" % (engine, template))
+    else:
+        print("FAIL %s: want one n_plus_one_sql [%s], got %s" % (engine, template, n1))
+PY
+)" || die "could not parse ${TMP_DIR}/lf.json"
+while IFS= read -r line; do
+  case "${line}" in
+    "ok "*) ok "${line#ok }" ;;
+    *)      lf_fail "${line#FAIL }" ;;
+  esac
+done <<< "${LF_LINES}"
+LF_SARIF_N1="$(python3 -c "
+import json,sys
+r=json.load(open(sys.argv[1]))
+print(sum(1 for x in r['runs'][0]['results'] if x.get('ruleId')=='n_plus_one_sql'))" "${TMP_DIR}/lf.sarif")" \
+  || die "could not parse ${TMP_DIR}/lf.sarif"
+if [ "${LF_SARIF_N1}" = "4" ]; then
+  ok "sarif output holds 4 n_plus_one_sql results"
+else
+  lf_fail "sarif output: want 4 n_plus_one_sql results, got ${LF_SARIF_N1}"
+fi
+for fmt in json sarif; do
+  hits="$({ grep -oE 'secret|corp\.test' "${TMP_DIR}/lf.${fmt}" || true; } | wc -l | tr -d ' ')"
+  if [ "${hits}" = "0" ]; then
+    ok "secret and corp.test appear 0 times in the ${fmt} output"
+  else
+    lf_fail "string content leaked: secret or corp.test appears ${hits} time(s) in the ${fmt} output"
+  fi
+done
+[ "${LF_FAILS}" = "0" ] || die "${LF_FAILS} literal-form check(s) failed"
+
 # --- verdict ----------------------------------------------------------------
-# PASS reflects the 0.9.2 and 0.25.5 changes under test (normalize/sql.rs). The HTML
+# PASS reflects the 0.9.2, 0.25.5 and 0.31.3 changes under test (normalize/sql.rs). The HTML
 # exemplar observation is reported but does not gate this scenario.
 verdict="PASS"
 {
@@ -219,6 +284,10 @@ verdict="PASS"
   echo "| postgresql double-quoted identifiers kept | yes |"
   echo "| example.com in OTLP analyze JSON/SARIF | 0 |"
   echo "| engine-less native JSON keeps double-quoted value (documented gap) | yes |"
+  echo "| mysql and engine-less backslash-escaped quote kept in its string, one N+1 each | yes |"
+  echo "| mssql string ends on a trailing backslash, one N+1 | yes |"
+  echo "| postgresql hex and exponent literals collapse, one N+1 | yes |"
+  echo "| secret/corp.test in OTLP analyze JSON/SARIF | 0 |"
   echo ""
   if [ "${HTML_EXEMPLAR_LEAK}" = "yes" ]; then
     echo "> Observation: the normalized template (the 0.9.2 fix) masks bracket/array"

@@ -41,6 +41,17 @@
 #     double-quoted value is kept: the documented gap, pinned so a silent
 #     change of the default shows up.
 #
+#   literal-forms.otlp.json  (0.31.3)
+#     OTLP JSON, four traces of six CLIENT spans, distinct values 1..6:
+#       E1  db.system=mysql       WHERE note = 'it\'s secret-<n>'
+#       E2  no engine attribute   same statement
+#       E3  db.system=mssql       WHERE path = 'C:\Temp\' AND owner = 'owner-<n>@corp.test'
+#       E4  db.system=postgresql  WHERE h = 0x<n>F AND v = <n>.5e-3
+#     E1 and E2 read the backslash as an escape, E3 as an ordinary character
+#     (SQL Server strings follow the standard). E4's hex and exponent values
+#     collapse to one ? each. Before 0.31.3 every trace split into one
+#     template per value and secret-<n> reached the template.
+#
 # stdlib-only. Regenerating needs no extra packages. verify.sh consumes the
 # committed *.native.json and double-quote.otlp.json directly and never runs
 # this generator.
@@ -148,12 +159,44 @@ def build_double_quote_gap():
     ]
 
 
+def build_literal_forms_otlp():
+    note = "SELECT * FROM users WHERE note = 'it\\'s secret-%d'"
+    path = "SELECT * FROM files WHERE path = 'C:\\Temp\\' AND owner = 'owner-%d@corp.test'"
+    spans = []
+    for trace_hex, key, engine, stmt in (
+        (0xE1, "db.system", "mysql", note),
+        (0xE2, None, None, note),
+        (0xE3, "db.system", "mssql", path),
+    ):
+        for i in range(1, 7):
+            span = otlp_span(trace_hex, i, stmt % i, key, engine)
+            if key is None:
+                span["attributes"] = span["attributes"][1:]
+            spans.append(span)
+    spans += [
+        otlp_span(0xE4, i, "SELECT * FROM metrics WHERE h = 0x%dF AND v = %d.5e-3" % (i, i),
+                  "db.system", "postgresql")
+        for i in range(1, 7)
+    ]
+    return {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [{"key": "service.name", "value": {"stringValue": "shop-users"}}]
+                },
+                "scopeSpans": [{"scope": {"name": "lab"}, "spans": spans}],
+            }
+        ]
+    }
+
+
 def main():
     for name, events in (
         ("backtick.native.json", build_backtick()),
         ("array-redaction.native.json", build_array_redaction()),
         ("double-quote.otlp.json", build_double_quote_otlp()),
         ("double-quote-gap.native.json", build_double_quote_gap()),
+        ("literal-forms.otlp.json", build_literal_forms_otlp()),
     ):
         path = os.path.join(HERE, name)
         with open(path, "w") as fh:
