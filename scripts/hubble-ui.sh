@@ -28,7 +28,7 @@ helm repo add cilium https://helm.cilium.io >/dev/null 2>&1 || true
 helm repo update cilium >/dev/null
 helm upgrade cilium cilium/cilium \
   --namespace kube-system \
-  --version 1.20.2 \
+  --version 1.20.3 \
   --reuse-values \
   --set hubble.ui.enabled=true \
   --wait --timeout 3m

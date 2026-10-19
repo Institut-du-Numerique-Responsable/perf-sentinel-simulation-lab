@@ -65,7 +65,7 @@ jobs:
           # fails (warning observed during 0.5.18 validation run). The lab's
           # helm usage (repo add/update, upgrade --install --wait/--set-file,
           # status, uninstall, lint) is verified compatible with v4.
-          version: 'v4.3.0'
+          version: 'v4.3.1'
 
       - name: Install kubectl
         uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e  # v5.2.0
@@ -325,7 +325,7 @@ jobs:
       - name: Install helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
         with:
-          version: 'v4.3.0'
+          version: 'v4.3.1'
 
       - name: Install kubectl
         uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e  # v5.2.0
@@ -542,7 +542,7 @@ jobs:
       - name: Install helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1
         with:
-          version: 'v4.3.0'
+          version: 'v4.3.1'
 
       - name: Install kubectl
         uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e  # v5.2.0
