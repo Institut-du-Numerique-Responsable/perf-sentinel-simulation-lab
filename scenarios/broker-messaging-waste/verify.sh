@@ -296,6 +296,7 @@ label_value = "$2"
 region = "${REGION}"
 
 [green.broker_static]
+placement = "dedicated"
 nodes = 3
 instance_type = "m5.2xlarge"
 provider = "aws"
@@ -1019,7 +1020,9 @@ except Exception as e:
 
   # And nothing may be invented on a period that never had a messaging figure.
   if [ -s "${PREV_ARCHIVE}" ]; then
-    PREV_PERIOD=(--period-type calendar-quarter --from 2026-04-01 --to 2026-06-30)
+    # The archive starts on 2026-06-05: an official period must start on or
+    # after the archive's first day (since 0.28.0) and cover at least 30 days.
+    PREV_PERIOD=(--period-type custom --from 2026-06-05 --to 2026-07-04)
     if "${PERF_SENTINEL_LOCAL_BIN}" disclose --intent official --confidentiality public \
          --org-config "${ORG_CONFIG}" "${PREV_PERIOD[@]}" \
          --input "${PREV_ARCHIVE}" --output "${TMP_DIR}/disclose-prev.json" >/dev/null 2>&1 \

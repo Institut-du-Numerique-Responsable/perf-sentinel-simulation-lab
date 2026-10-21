@@ -23,7 +23,8 @@
 #       per_service_energy_model says alumet_rapl.
 #   G1  mistyped mapping -> the no-match warn latches ONCE after 3 ticks while
 #       scraping stays healthy.  G2 empty service_mappings -> startup warn
-#       once, never recurring.  G3 /api/energy: 6 rows, alumet FIRST.
+#       once, never recurring.  G3 /api/energy: 16 rows (7 energy backends, Electricity
+#       Maps, 8 grid operator feeds), alumet FIRST.
 #
 # Wire gotchas locked by the 2026-07-16 capture (see fixtures/):
 #   - the .deb ships /etc/alumet/alumet-config.toml WITHOUT a
@@ -474,11 +475,11 @@ ENERGY_JSON="$(curl -fsS "${DAEMON_URL}/api/energy" 2>/dev/null)"
 if printf '%s' "${ENERGY_JSON}" | python3 -c '
 import sys, json
 b = json.load(sys.stdin).get("backends", [])
-ok = len(b) == 6 and b[0].get("backend") == "alumet" and b[0].get("configured") is True
+ok = len(b) == 16 and b[0].get("backend") == "alumet" and b[0].get("configured") is True
 sys.exit(0 if ok else 1)' 2>/dev/null; then
-  assert_pass "G3" "/api/energy: 6 backends, alumet FIRST and configured"
+  assert_pass "G3" "/api/energy: 16 backends, alumet FIRST and configured"
 else
-  assert_fail "G3" "/api/energy shape wrong (want 6 rows, alumet first): $(printf '%s' "${ENERGY_JSON}" | head -c 160)"
+  assert_fail "G3" "/api/energy shape wrong (want 16 rows, alumet first): $(printf '%s' "${ENERGY_JSON}" | head -c 160)"
 fi
 stop_daemon
 

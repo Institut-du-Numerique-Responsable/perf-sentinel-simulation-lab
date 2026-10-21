@@ -44,7 +44,7 @@ against a frozen file (verified to machine epsilon during development).
 | F  | Alumet + Scaphandre both configured and matching the same service -> `per_service_energy_model = alumet_rapl` (Alumet outranks)               |
 | G1 | mistyped mapping -> no-match warn latches exactly once after 3 ticks while `scrape_total{success}` keeps counting and `failed` stays 0        |
 | G2 | empty `service_mappings` -> exactly one startup warn, never recurring                                                                         |
-| G3 | `/api/energy` returns 6 backends with `alumet` FIRST (breaking change vs 0.9.11: 5 rows, different order)                                     |
+| G3 | `/api/energy` returns 16 rows with `alumet` FIRST: the 7 energy backends, Electricity Maps and the 8 grid operator feeds (0.32.0)         |
 
 ## Hard-won wire facts (locked by the 2026-07-16 capture)
 

@@ -29,7 +29,7 @@
 #   K  an absent carbon figure names its OWN cause: green off with a live
 #      Electricity Maps scraper says so, zero traces says so, and the combined
 #      wording is gone.
-#   L  batch analysis warns once for all seven daemon-only GreenOps sections.
+#   L  batch analysis warns once for all eight daemon-only GreenOps sections.
 #      Daemon mode, green off, and no configured backend stay silent.
 #
 # I, J and K are not about fragments. They are here because they are the other
@@ -373,7 +373,13 @@ prometheus_endpoint = "http://127.0.0.1:1"
 default_provider = "aws"
 default_instance_type = "c5.4xlarge"
 
+[green.database_static]
+placement = "dedicated"
+nodes = 2
+instance_type = "db.r6i.large"
+
 [green.broker_static]
+placement = "dedicated"
 nodes = 1
 provider = "aws"
 instance_type = "m5.2xlarge"
@@ -446,7 +452,8 @@ all_report, off, none, daemon = (json.load(open(path)) for path in sys.argv[1:])
 warnings = [w for w in all_report.get("warning_details", []) if "batch run" in w["message"]]
 expected = {
     "[green.alumet]", "[green.scaphandre]", "[green.kepler]", "[green.redfish]",
-    "[green.cloud]", "[green.broker_static]", "[green.electricity_maps]",
+    "[green.cloud]", "[green.database_static]", "[green.broker_static]",
+    "[green.electricity_maps]",
 }
 assert len(warnings) == 1 and all(name in warnings[0]["message"] for name in expected)
 for report in (off, none, daemon):
@@ -454,7 +461,7 @@ for report in (off, none, daemon):
 PY
 then
   if [ "${L_ALL_RC}" = "0" ] && [ "${L_OFF_RC}" = "0" ] && [ "${L_NONE_RC}" = "0" ] && [ "${L_DAEMON_RC}" = "0" ]; then
-    assert_pass "L" "one batch warning names all seven sections; daemon, green-off and no-backend controls stay silent"
+    assert_pass "L" "one batch warning names all eight sections; daemon, green-off and no-backend controls stay silent"
   else
     assert_fail "L" "commands rc all/off/none/daemon=${L_ALL_RC}/${L_OFF_RC}/${L_NONE_RC}/${L_DAEMON_RC}"
   fi

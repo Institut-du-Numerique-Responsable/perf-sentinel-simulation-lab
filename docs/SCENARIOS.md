@@ -2370,7 +2370,7 @@ capture (`fixtures/alumet-wire-capture.prom`).
 within 1%, with rows sharing a label value summed. A declared-interval
 desync of 5.0 vs 1.0 must rescale by exactly x5. Alumet must outrank a
 configured-and- matching Scaphandre (`alumet_rapl`), both warn latches
-must fire exactly once, and `/api/energy` must return 6 rows with
+must fire exactly once, and `/api/energy` must return 16 rows with
 alumet first, a breaking change vs 0.9.11. Docker is optional: the
 live legs SKIP cleanly without it, the frozen legs always gate.
 Container gotchas are locked in the scenario README (file capabilities

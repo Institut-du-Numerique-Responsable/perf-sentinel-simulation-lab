@@ -20,7 +20,9 @@
 #     Energy tab, and the HTML dashboard.
 #   - disclosure schema v1.4: both tiers are now PUBLISHED in `disclose` as a
 #     separate labelled block (per-window disclosure_waste.database, period
-#     aggregate.database_waste with a provenance split), still OUTSIDE every total.
+#     aggregate.database_waste with a provenance split). Since 0.32.0 a
+#     measured figure is INSIDE the totals as a host term, never an
+#     application's (carbon_breakdown.database_kgco2eq).
 #
 # Self-contained: local release binary on loopback + a python http.server serving
 # the committed alumet-conformance capture augmented with ONE synthetic DB-cgroup
@@ -483,14 +485,19 @@ chk("ratio", ratio is not None and abs(ratio-exp_ratio) < 1e-9,
 chk("waste", wk is not None and ek is not None and ratio is not None and (ek==0 or abs(wk-ek*ratio) < 1e-9*max(1,abs(ek))),
     f"waste_kwh={wk} == energy_kwh*ratio={ek}*{ratio}={ (ek or 0)*(ratio or 0):.9g}")
 chk("gco2", gco2 is not None and gco2 > 0, f"waste_gco2={gco2}")
-# Exclusion is structural: the DB cgroup label never enters the per-service
-# energy maps, and the top-level energy_kwh equals the pure service sum, so the
-# DB figure is not folded into the totals.
+# Since 0.32.0 the measured host figure is INSIDE the totals, never an
+# application's: the DB cgroup label stays out of the per-service energy maps,
+# the top-level energy_kwh is the service sum plus the host kWh, the figure is
+# flagged in_totals, and co2.database_gco2 carries its carbon.
 svc_sum = sum(v for v in psk.values() if isinstance(v,(int,float)))
-excl = (db_label not in psk) and (db_label not in psm) \
-    and (top_ek is None or abs(top_ek - svc_sum) < 1e-6*max(1.0, abs(top_ek)))
-chk("exclusion", excl,
-    f"'{db_label}' absent from per-service maps; top energy_kwh={top_ek}==sum(service)={svc_sum} (DB {ek} not folded in)")
+co2 = gs.get("co2") or {}
+host_g = co2.get("database_gco2"); egco2 = dw.get("energy_gco2")
+incl = (db_label not in psk) and (db_label not in psm) and dw.get("in_totals") is True \
+    and top_ek is not None and ek is not None \
+    and abs(top_ek - (svc_sum + ek)) < 1e-6*max(1.0, abs(top_ek)) \
+    and host_g is not None and egco2 is not None and abs(host_g - egco2) < 1e-9*max(1.0, abs(egco2))
+chk("in-totals", incl,
+    f"'{db_label}' absent from per-service maps; in_totals={dw.get('in_totals')}; top energy_kwh={top_ek}==sum(service)={svc_sum}+DB {ek}; co2.database_gco2={host_g}==energy_gco2={egco2}")
 # Sanity: DB energy is a positive multiple of the per-scrape reading.
 mult = (ek/per_scrape) if (ek and per_scrape) else 0
 chk("scale", ek is not None and per_scrape>0 and ek >= per_scrape*0.9,
@@ -502,18 +509,19 @@ print(f"RESULT\t{'PASS' if allok else 'FAIL'}")
 EOF
   cat "${TMP_DIR}/b-verdict.txt"
   if grep -q "^RESULT	PASS" "${TMP_DIR}/b-verdict.txt"; then
-    assert_pass "B-arithmetic" "database_waste present; ratio + waste_kwh recomputed; gco2>0; excluded from totals"
+    assert_pass "B-arithmetic" "database_waste present; ratio + waste_kwh recomputed; gco2>0; host energy and carbon inside the totals, never an application's"
   else
     assert_fail "B-arithmetic" "one or more database_waste checks failed (see b-verdict.txt): $(grep '^NO' "${TMP_DIR}/b-verdict.txt" | tr '\n' ';')"
   fi
 
   # Force a few window closes so the archive carries >=1 disclosure_waste.database
-  # line, then disclose it. 0.9.14 (schema v1.4) PUBLISHES the measured figure as
-  # aggregate.database_waste, so the old "absent from disclose" assertion is gone.
-  # The invariant now: the block is PRESENT (tagged the measured model) yet still
-  # OUTSIDE every total: proven by disclosing the archive twice, once with the
-  # per-window database block and once with it stripped, and asserting the period
-  # totals do not move.
+  # line, then disclose it. Since 0.32.0 the measured figure is INSIDE the
+  # period totals as a host term: the block is PRESENT (tagged the measured
+  # model), every window carrying it counts it in the totals, and
+  # carbon_breakdown.database_kgco2eq holds its carbon. Disclosing the archive
+  # again with the per-window database block stripped leaves the totals where
+  # they are (the host kWh then reads as application energy), so the totals
+  # never depend on the block's presence.
   for _ in 1 2 3 4; do
     post_traces >/dev/null 2>&1; sleep 3
     [ "$(count_db_windows "${TMP_DIR}/archive-b.ndjson")" -gt 0 ] && break
@@ -553,6 +561,8 @@ checks = {
   "block present": bool(af.get("database_waste")),
   "measured tag":  ("alumet_rapl" in models) and ("estimated" not in models),
   "all measured":  mw is not None and wf is not None and mw == wf and (dbw.get("estimated_windows") or 0) == 0,
+  "in totals":     (dbw.get("in_totals_windows") or 0) == wf and (dbw.get("in_totals_energy_kwh") or 0) > 0,
+  "host carbon term": ((af.get("carbon_breakdown") or {}).get("database_kgco2eq") or 0) > 0,
   "energy total unmoved": close(af.get("total_energy_kwh"),  asr.get("total_energy_kwh")),
   "carbon total unmoved": close(af.get("total_carbon_kgco2eq"), asr.get("total_carbon_kgco2eq")),
   "stripped absent": not asr.get("database_waste"),
@@ -565,7 +575,7 @@ print("models=%s measured=%s with_figure=%s tE=%s(strip %s) tC=%s(strip %s)" % (
 if bad: print("FAILED: " + ", ".join(bad)); sys.exit(1)
 PY
       )"; then
-        assert_pass "B-disclose-published" "aggregate.database_waste published (${arch_dw} window(s), ${bout}) but totals unchanged vs stripped"
+        assert_pass "B-disclose-published" "aggregate.database_waste published and in the totals (${arch_dw} window(s), ${bout}), totals unchanged vs stripped"
       else
         assert_fail "B-disclose-published" "disclose publish/exclusion invariant failed (${bout})"
       fi
@@ -609,7 +619,7 @@ if curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1; then
     record_skip "F-render" "the pty driver failed to run, see ${MON_OUT}"
   elif grep -aqF "Database waste" "${MON_OUT}"; then
     extra=""
-    grep -aqF "excluded from totals" "${MON_OUT}" && extra=" + 'excluded from totals'"
+    grep -aqF "host energy, in the report totals" "${MON_OUT}" && extra=" + 'host energy, in the report totals'"
     assert_pass "F-render" "query monitor Energy tab renders the 'Database waste:' line${extra}"
   else
     record_skip "F-render" "the Energy tab did not render the line, see ${MON_OUT}; data plane proven above + upstream render unit tests cover it"
@@ -801,13 +811,14 @@ PY
 
   # G-text: the default text report carries a "Database waste:" line tagged
   # `model estimated` with the `[within the report totals]` scope, inverted vs
-  # the measured `[excluded from totals]` scope (color is off on a non-tty).
+  # the measured `[host energy, in the report totals]` scope (color is off on
+  # a non-tty).
   "${PERF_SENTINEL_LOCAL_BIN}" analyze --input "${SQL_TRACES}" --config "${GREEN_CFG}" \
     > "${TMP_DIR}/g-report.txt" 2>/dev/null || true
   gline="$(grep -a "Database waste:" "${TMP_DIR}/g-report.txt" | head -1)"
   if printf '%s' "${gline}" | grep -qF "model estimated" \
      && printf '%s' "${gline}" | grep -qF "within the report totals" \
-     && ! printf '%s' "${gline}" | grep -qF "excluded from totals"; then
+     && ! printf '%s' "${gline}" | grep -qF "host energy, in the report totals"; then
     assert_pass "G-text" "text report Database waste line: model estimated + [within the report totals] (scope inverted vs measured)"
   else
     assert_fail "G-text" "text Database waste line missing estimated/within-totals scope: ${gline:-<no line>}"
@@ -950,7 +961,9 @@ fi
 # fields (reports-thr5, binary 0.8.2): the official intent must accept the v1.4
 # schema, the block must stay absent (skip_serializing_if), and the content hash
 # round-trips fail-closed.
-PREV_PERIOD=(--period-type calendar-quarter --from 2026-04-01 --to 2026-06-30)
+# The archive starts on 2026-06-05: an official period must start on or
+# after the archive's first day (since 0.28.0) and cover at least 30 days.
+PREV_PERIOD=(--period-type custom --from 2026-06-05 --to 2026-07-04)
 if [ -s "${PREV14_ARCHIVE}" ] && "${PERF_SENTINEL_LOCAL_BIN}" disclose --intent official --confidentiality public \
      --org-config "${ORG_CONFIG}" "${PREV_PERIOD[@]}" \
      --input "${PREV14_ARCHIVE}" --output "${TMP_DIR}/h-official.json" >/dev/null 2>"${TMP_DIR}/h-off.err"; then

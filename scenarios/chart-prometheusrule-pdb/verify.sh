@@ -62,6 +62,10 @@ REQUIRED_METRICS=(
   perf_sentinel_redfish_last_scrape_age_seconds
   perf_sentinel_cloud_energy_last_scrape_age_seconds
   perf_sentinel_alumet_last_scrape_age_seconds
+  # The host CPU probes of [green.database_static] and [green.broker_static]
+  # (chart 0.32.0, PerfSentinelHostCpuProbeStale).
+  perf_sentinel_database_cpu_last_scrape_age_seconds
+  perf_sentinel_broker_cpu_last_scrape_age_seconds
 )
 
 # The other half of the same rule, asserted rather than assumed. Dropping the

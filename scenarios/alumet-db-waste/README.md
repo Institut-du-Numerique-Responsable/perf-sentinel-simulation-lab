@@ -36,8 +36,10 @@ It builds on the 0.9.12 Alumet backend (see [`alumet-conformance`](../alumet-con
   HTML dashboard.
 - **Disclosure schema v1.4**: both tiers are now **published** in `disclose`
   as a separate labelled block (per-window `disclosure_waste.database`, period
-  `aggregate.database_waste` with a provenance split), still **outside every
-  total** (`aggregate.total_energy_kwh` / `total_carbon_kgco2eq` do not move).
+  `aggregate.database_waste` with a provenance split).
+- **Host energy in the totals (0.32.0)**: a measured figure is now **inside**
+  `energy_kwh`, `co2.total` and the period totals as a host term, never an
+  application's, with its carbon in `carbon_breakdown.database_kgco2eq`.
 
 ## Prerequisites
 
@@ -72,12 +74,12 @@ estimated windows.
 
 | leg | what it locks |
 |-----|---------------|
-| **B** | Measured `database_waste` end to end: present with `energy_kwh > 0`; `sql_waste_ratio == avoidable_sql/total_sql`; `waste_kwh == energy_kwh * sql_waste_ratio` (both recomputed); `waste_gco2 > 0`; the DB label never enters the per-service energy maps and the top-level `energy_kwh` equals the pure service sum (exclusion). And (0.9.14) the archive is **published** in `disclose` as `aggregate.database_waste` (`models = [alumet_rapl]`) yet still **outside the totals**: the period totals do not move vs a database-stripped copy of the same archive. |
+| **B** | Measured `database_waste` end to end: present with `energy_kwh > 0`; `sql_waste_ratio == avoidable_sql/total_sql`; `waste_kwh == energy_kwh * sql_waste_ratio` (both recomputed); `waste_gco2 > 0`; the DB label never enters the per-service energy maps, and since 0.32.0 the figure is **inside the totals** as a host term: `in_totals` is true, the top-level `energy_kwh` equals the service sum plus the DB `energy_kwh`, and `co2.database_gco2` equals its `energy_gco2`. The archive is **published** in `disclose` as `aggregate.database_waste` (`models = [alumet_rapl]`) with every window in the totals (`in_totals_windows == windows_with_figure`, `in_totals_energy_kwh > 0`) and `carbon_breakdown.database_kgco2eq > 0`, and the period totals do not move vs a database-stripped copy of the same archive (the host kWh then reads as application energy). |
 | **C** | Sticky live cell: `database_waste` never flaps to `null` between scrapes, and after the scraper dies it ages out within the TTL (`2 × staleness = 6 × scrape interval`, ≈30 s here) under continued traffic, never pinned to a dead measurement forever. |
 | **D** | Carry-over under shedding: with a 1-deep analysis queue and a 20-trace window flooded to shed whole batches, the DB energy summed across the archived NDJSON windows is conserved (quantized to whole scrapes, no vanishing) and the daemon **sheds instead of OOMing**. |
 | **E** | Config validation: a `label_value` colliding with `service_mappings`, a typo'd `[green.alumet.databse]`, a `[green.alumet.database]` with no endpoint, and an unknown key inside `[green.alumet]` (the `deny_unknown_fields` compat break) are all **rejected at load**; a charset-valid but unknown `region` only **warns** and yields `database_waste` with `waste_gco2` absent. |
 | **F** | `query monitor` Energy tab: the `/api/export/report` snapshot backing `build_energy_lines` carries every field the "Database waste:" line renders; a best-effort headless TUI capture greps the rendered line (the TUI is not driven headless in CI, and its rendering + region sanitization are covered by upstream unit tests). |
-| **G** | **Estimated fallback** on batch `analyze` (no `[green.alumet.database]`, no Alumet): `green_summary.database_waste.model == "estimated"`, `energy_kwh > 0` and a subset of the report totals, on all three surfaces: JSON, the text `Database waste:` line tagged `[within the report totals]` (inverted vs the measured `[excluded from totals]`), and the HTML dashboard's Database-waste card. |
+| **G** | **Estimated fallback** on batch `analyze` (no `[green.alumet.database]`, no Alumet): `green_summary.database_waste.model == "estimated"`, `energy_kwh > 0` and a subset of the report totals, on all three surfaces: JSON, the text `Database waste:` line tagged `[within the report totals]` (never the measured `[host energy, in the report totals]`), and the HTML dashboard's Database-waste card. |
 | **H** | **Disclose v1.4 round-trip** over a mixed archive (measured windows from leg B + estimated windows from a fresh no-DB daemon): `aggregate.database_waste` carries the provenance split (`measured_windows + estimated_windows == windows_with_figure`, `models == {alumet_rapl, estimated}`) while `total_energy_kwh` / `total_carbon_kgco2eq` stay unchanged vs a stripped copy; the official intent accepts the `perf-sentinel-report/v1.4` schema; `verify-hash` `content_hash` round-trips fail-closed; and a pre-v1.4 no-database archive discloses **without** a spurious `database_waste` block (additive-only fields). |
 | **I** | Provenance honesty: every estimated archived window tags `model` literally `"estimated"` (never a leaked measured tag), and a **declared-but-undelivered** DB label (declared `[green.alumet.database]` whose cgroup the scraper never serves) emits **no** `database_waste`, with no measured figure and no estimated fallback, so the period never double-counts. |
 
