@@ -825,7 +825,8 @@ PY
   fi
 
   # G-html: the HTML dashboard's green panel renders a Database waste card whose
-  # scope reads "within the report totals" for the estimated model.
+  # scope reads "within the report totals" for the estimated model, through
+  # wasteScope() since 0.32.0.
   # The dashboard is a JS SPA: it ships a greenCard("Database waste", ...) builder
   # whose subtitle picks the scope from the embedded report's model. Assert the
   # card builder AND the estimated-scope branch are co-located (within ~600 chars,
@@ -840,11 +841,15 @@ import sys
 h = open(sys.argv[1], encoding="utf-8", errors="replace").read()
 # Every occurrence, not the first: the method-sheet glossary entry names
 # the card 95 KB before the builder does, and anchoring on it made this
-# check unreachable rather than red.
+# check unreachable rather than red. Since 0.32.0 the card's subtitle calls
+# wasteScope(), which holds the estimated-scope wording, so the builder must
+# sit next to that call and wasteScope() must carry the wording.
 i, ok = h.find("Database waste"), False
 while i != -1 and not ok:
-    ok = "within the report totals" in h[max(0, i - 600):i + 600]
+    ok = "wasteScope(dbw)" in h[max(0, i - 600):i + 600]
     i = h.find("Database waste", i + 1)
+j = h.find("function wasteScope(")
+ok = ok and j != -1 and "within the report totals" in h[j:j + 400]
 sys.exit(0 if ok else 1)
 PY
   then
