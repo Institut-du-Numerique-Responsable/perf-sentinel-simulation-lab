@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 100 scenarios live under `scenarios/<name>/` and each one ships a
+The 101 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -195,7 +195,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 100
+`grouping-identity` is the 0.11 contract gate. The lab now ships 101
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -374,7 +374,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 100. Each validated version is recorded in
+The release gate runs all 101. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -439,7 +439,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 100 (sequential, long-running-drift is the long pole)
+# All 101 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1470,7 +1470,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 100 scenarios, in an order
+`make verify-all-scenarios` includes all 101 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -2622,6 +2622,40 @@ Noted rather than failed: on a RabbitMQ **default exchange**
 publishes to distinct routing keys collapse into one template, the
 same class as the host-strip merges documented in
 `rpc-carrier-parity`.
+
+## database-host-groups (0.33.0 host groups of different sizes)
+
+`make verify-database-host-groups`. Self-contained: a local release
+binary on loopback, a python stand-in for the Prometheus
+`/api/v1/query` endpoint that answers per query from a state file, and
+NDJSON traffic on the JSON socket. No cluster, no Docker.
+
+Gates the `[[green.database_static.hosts]]` and
+`[[green.broker_static.hosts]]` groups: one entry per group of
+identical hosts, each with its own `nodes`, `instance_type` and
+`cpu_query`, each billing from its CPU, falling back to its own ceiling
+and recovering on its own. Unit tests cover the per-group arbitration
+against an injected clock. None meets the cloud scraper fetching
+several probes on one tick while one of them goes silent and comes back
+with a reading that reaches back over the outage.
+
+Twelve legs. **D1-D6** the load: a group without `instance_type`
+(refused, naming `hosts[1]`), two groups on one `cpu_query` (refused by
+index, the query never echoed), `hosts` next to a top-level `nodes`,
+under `placement = "shared"` and next to `[green.alumet.database]`, all
+refused, and a section without `hosts` still loading. **G1** both
+groups live: `cloud_specpower`, and the slope of
+`perf_sentinel_scored_database_energy_kwh_total` matching each group's
+SPECpower envelope at its CPU, summed. **G2** the reader's query
+answers an empty vector: `database_specpower` while the writer keeps
+its reading, so writer live plus reader ceiling, 24 percent away from
+two ceilings, and the age gauge reading the silent group. **G3** the
+reader back: `cloud_specpower`, and the energy over outage and recovery
+billed once, 41 percent away from a reading stacked on the ceiling.
+**B1** broker groups next to database groups, `messaging_waste` on
+`cloud_specpower` at its groups' envelope. Powers are checked within 12
+percent over 20 s, with the watts taken from the embedded SPECpower
+table, and the script refuses to run when those rows move.
 
 ## archive-integrity-chain (0.9.25 hash chain over the window archive)
 
