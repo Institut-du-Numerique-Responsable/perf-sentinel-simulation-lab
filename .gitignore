@@ -64,7 +64,6 @@ artifacts/fixtures/*
 scenarios/ci-e2e-jenkins/fixtures/project/
 
 # Local tool output, never committed
-graphify-out/
 __pycache__/
 
 # PHP dependencies installed by `composer install` (and by Renovate's
