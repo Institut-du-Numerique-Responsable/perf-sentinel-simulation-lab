@@ -137,7 +137,7 @@ Knobs:
 | Variable | Default | Effect |
 |---|---|---|
 | `BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel:0.20.2` | the before-the-feature baseline of the counter-proofs in legs A, B, C and E; fixed, never bumped |
-| `FOLD_BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:b31fe0f1…` (0.32.0) | the latest release, the reference of leg D; bump it with the pin in `manifests/perf-sentinel-daemon.yaml`, same digest |
+| `FOLD_BASELINE_IMAGE` | `ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:4def9a4f…` (0.33.0) | the latest release, the reference of leg D; bump it with the pin in `manifests/perf-sentinel-daemon.yaml`, same digest |
 | `FPF_DAEMON_HTTP_PORT` / `FPF_DAEMON_GRPC_PORT` | `14828` / `14827` | loopback ports of the daemon under test |
 | `FPF_BASELINE_HTTP_PORT` | `14838` | published port of the `BASELINE_IMAGE` container |
 | `FPF_FOLD_BASELINE_HTTP_PORT` | `14839` | published port of the `FOLD_BASELINE_IMAGE` container |
