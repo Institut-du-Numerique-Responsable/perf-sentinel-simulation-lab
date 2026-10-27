@@ -1419,17 +1419,19 @@ make verify-output-formats-coverage  # depends on ci-shift-left having run
 ### template-gitlab-ci
 
 Validates the upstream `docs/ci-templates/gitlab-ci.yml` at the tag the
-lab fixture pins, 0.29.0 today:
+lab fixture pins, 0.35.0 today:
 
 1. Curl upstream template (fallback to local clone).
 2. Lint via GitLab CE CI Lint API (`POST /api/v4/ci/lint`).
 3. Parity vs lab fixture
    `artifacts/fixtures/gitlab-ci-from-upstream.yml` on structural
    invariants (perf-sentinel job, --ci flag, SARIF artifact, version
-   pin).
+   pin) and the 0.35.0 shape (`.pre` install job by `uname -m`,
+   `check_name`, `fingerprint: .signature`, line >= 1, catch-all rules).
 4. Delegate to `scripts/verify-gitlab-perf-sentinel.sh` for the full
    end-to-end pipeline check (gate `allow_failure: true` on main,
    `allow_failure: false` on MR, SARIF + Code Quality artefacts).
+   Skipped while the pinned release has no published assets.
 
 ```bash
 make verify-template-gitlab-ci

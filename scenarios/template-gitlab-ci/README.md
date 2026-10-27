@@ -10,7 +10,7 @@ the existing `scripts/verify-gitlab-perf-sentinel.sh` end-to-end check.
 make verify-template-gitlab-ci
 
 # Override version:
-UPSTREAM_VERSION=0.22.1 make verify-template-gitlab-ci
+UPSTREAM_VERSION=0.35.0 make verify-template-gitlab-ci
 
 # Use a local copy (offline):
 UPSTREAM_PATH=~/perf-sentinel/docs/ci-templates/gitlab-ci.yml \
@@ -24,8 +24,10 @@ Report at `/tmp/scenario-template-gitlab-ci-report.md`.
 
 ## What it validates
 
-1. **Fetch**. Curl the upstream template at the pinned `UPSTREAM_VERSION` (fallback to local
-   clone at `~/RustroverProjects/perf-sentinel/` if curl fails).
+1. **Fetch**. Curl the upstream template at the fixture's pin (`UPSTREAM_VERSION`
+   overrides it), falling back to the local clone at `PERF_SENTINEL_REPO_PATH`
+   (default `~/RustroverProjects/perf-sentinel/`) when the tag does not exist
+   yet, which is the pre-release case.
 2. **Lint via GitLab CE CI Lint API**. POST the YAML to
    `/api/v4/ci/lint`, asserts `valid: true`. Catches schema regressions
    that `bash -n` and yq cannot detect (gitlab-specific keywords).
@@ -35,6 +37,10 @@ Report at `/tmp/scenario-template-gitlab-ci-report.md`.
    - `--ci` flag present (quality gate enforced)
    - SARIF artifact declared
    - PERF_SENTINEL_VERSION variable pinned (no floating tags)
+   - the 0.35.0 shape, in both files: a `perf-sentinel-install` job on
+     `stage: .pre` picking the asset by `uname -m` (arm64 included), Code
+     Quality entries with `check_name: .type` and `fingerprint: .signature`,
+     the line kept at 1 or more, a catch-all rule, and `exit_codes: [75]`
    The lab fixture is intentionally a derivative (adds an
    `integration-tests` dummy job and uncomments the Free-tier Pages
    block), so byte-identity is not the goal.
@@ -47,6 +53,9 @@ Report at `/tmp/scenario-template-gitlab-ci-report.md`.
      enforced on MR via `allow_failure: false`),
    - downloads SARIF + perf-sentinel-report.json + Code Quality
      artefacts and asserts they parse and contain the expected schema.
+   Skipped when the fixture's pinned release has no published assets yet:
+   the seeded pipeline downloads them, so before the tag there is nothing
+   to run.
 
 ## Verdicts
 
@@ -64,7 +73,10 @@ Report at `/tmp/scenario-template-gitlab-ci-report.md`.
   bumped by hand at release time. Step 3 fails when the fixture pin and
   the fetched template's pin disagree, so the drift cannot stay silent:
   it sat on 0.5.17 against a 0.13.1 template for several releases while
-  the scenario reported PASS.
+  the scenario reported PASS. During a pre-release pass the fixture
+  already names the release under validation: the template comes from
+  the local clone, the pins are not compared, and step 4 skips until the
+  assets are published.
 - `verify-gitlab-perf-sentinel.sh` requires `make up-gitlab && make
   seed-gitlab-project` to have run beforehand. If the fixture project
   doesn't exist yet, the E2E step skips with a clear message.

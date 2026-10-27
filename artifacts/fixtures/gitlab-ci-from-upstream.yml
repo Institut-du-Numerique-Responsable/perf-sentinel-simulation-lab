@@ -1,7 +1,9 @@
 # perf-sentinel GitLab CI pipeline (lab fixture).
 #
 # Derived from docs/ci-templates/gitlab-ci.yml in the perf-sentinel
-# repo. Differences vs the upstream template:
+# repo (0.35.0 structure: a `.pre` install job picking the asset by
+# architecture, Code Quality `check_name` and a signature fingerprint,
+# catch-all rules). Differences vs the upstream template:
 #   - PERF_SENTINEL_VERSION pinned to the upstream template's own default.
 #     The seeded pipeline downloads that release binary from GitHub, so it
 #     has to name a PUBLISHED version. scenarios/template-gitlab-ci asserts
@@ -9,9 +11,10 @@
 #     a binary nobody ships.
 #   - integration-tests dummy job that publishes test-traces.json so
 #     the perf-sentinel job picks it up via dependencies
-#   - dependencies: [integration-tests] uncommented on perf-sentinel
+#   - integration-tests uncommented in the perf-sentinel dependencies
 #   - Free-tier Pages block uncommented (used by the lab verify)
-#   - Premium-tier Pages block left commented (out of scope)
+#   - Premium-tier Pages block left out (out of scope)
+#   - the long upstream comments are cut to what the lab relies on
 #
 # This file lives at artifacts/fixtures/ in the simulation lab and
 # gets pushed verbatim to the perf-sentinel-template-test project on
@@ -22,9 +25,45 @@ stages:
   - perf-sentinel
 
 variables:
-  PERF_SENTINEL_VERSION: "0.29.0"
+  PERF_SENTINEL_VERSION: "0.35.0"
   PERF_SENTINEL_TRACES: "test-traces.json"
   PERF_SENTINEL_CONFIG: ".perf-sentinel.toml"
+
+# Installs the binary once and hands it to the later jobs as an artifact.
+# Exit 75 marks a tooling problem (download, egress, an architecture with
+# no release asset) and is the only failure allowed through. A checksum
+# mismatch is a separate script item and always blocks.
+perf-sentinel-install:
+  stage: .pre
+  image: debian:bookworm-slim
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates || exit 75
+    - |
+      set -euo pipefail
+      case "$(uname -m)" in
+        x86_64) ASSET=perf-sentinel-linux-amd64 ;;
+        aarch64|arm64) ASSET=perf-sentinel-linux-arm64 ;;
+        *) echo "perf-sentinel: unsupported architecture $(uname -m)" >&2; exit 75 ;;
+      esac
+      BASE_URL="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
+      curl -sSLf -o "${ASSET}"     "${BASE_URL}/${ASSET}"     || exit 75
+      curl -sSLf -o SHA256SUMS.txt "${BASE_URL}/SHA256SUMS.txt" || exit 75
+    - |
+      set -euo pipefail
+      grep "  ${ASSET}$" SHA256SUMS.txt | sha256sum -c -
+      mkdir -p "${CI_PROJECT_DIR}/bin"
+      install -m 0755 "${ASSET}" "${CI_PROJECT_DIR}/bin/perf-sentinel"
+      "${CI_PROJECT_DIR}/bin/perf-sentinel" --version
+  allow_failure:
+    exit_codes: [75]
+  artifacts:
+    paths:
+      - bin/perf-sentinel
+    expire_in: 1 day
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: on_success
 
 # Dummy integration-tests job: republishes the in-repo test-traces.json
 # as an artifact so the perf-sentinel job can consume it via
@@ -45,23 +84,10 @@ perf-sentinel:
   stage: perf-sentinel
   image: debian:bookworm-slim
   dependencies:
+    - perf-sentinel-install
     - integration-tests
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates jq
-    - |
-      set -euo pipefail
-      BASE_URL="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
-      curl -sSLf -o perf-sentinel-linux-amd64 "${BASE_URL}/perf-sentinel-linux-amd64"
-      curl -sSLf -o SHA256SUMS.txt            "${BASE_URL}/SHA256SUMS.txt"
-      # Verify integrity before executing. Fails the job if the binary was
-      # tampered with or the release is corrupted.
-      grep 'perf-sentinel-linux-amd64' SHA256SUMS.txt | sha256sum -c -
-      # Install under the project bin/ rather than /usr/local/bin so the
-      # template works without elevated privileges on hardened runners.
-      mkdir -p "${CI_PROJECT_DIR}/bin"
-      install -m 0755 perf-sentinel-linux-amd64 "${CI_PROJECT_DIR}/bin/perf-sentinel"
-      export PATH="${CI_PROJECT_DIR}/bin:${PATH}"
-      perf-sentinel --version
+    - apt-get update && apt-get install -y --no-install-recommends jq || exit 75
   script:
     # SARIF artifact for archive and inspection.
     - |
@@ -69,20 +95,23 @@ perf-sentinel:
         --input "${PERF_SENTINEL_TRACES}" \
         --config "${PERF_SENTINEL_CONFIG}" \
         --format sarif \
-        > findings.sarif
+        > findings.sarif || exit 75
     # JSON report for downstream tooling and the Code Quality conversion.
     - |
       "${CI_PROJECT_DIR}/bin/perf-sentinel" analyze \
         --input "${PERF_SENTINEL_TRACES}" \
         --config "${PERF_SENTINEL_CONFIG}" \
         --format json \
-        > perf-sentinel-report.json || true
-    # Convert findings to GitLab Code Quality format.
+        > perf-sentinel-report.json || exit 75
+    # Convert findings to GitLab Code Quality format. The fingerprint is
+    # the finding signature, the line is kept at 1 or more.
     - |
+      set -euo pipefail
       jq '[
         .findings[] | {
           description: ("[" + .type + "] " + .suggestion),
-          fingerprint: (.trace_id + "-" + .type + "-" + .source_endpoint),
+          check_name: .type,
+          fingerprint: .signature,
           severity: (
             if .severity == "critical" then "critical"
             elif .severity == "warning" then "major"
@@ -90,7 +119,7 @@ perf-sentinel:
           ),
           location: {
             path: (.code_location.filepath // "unknown"),
-            lines: { begin: (.code_location.lineno // 1) }
+            lines: { begin: (if (.code_location.lineno // 0) > 0 then .code_location.lineno else 1 end) }
           }
         }
       ]' perf-sentinel-report.json > gl-code-quality-report.json
@@ -110,10 +139,17 @@ perf-sentinel:
     reports:
       codequality: gl-code-quality-report.json
     expire_in: 1 week
+  # Only the merge request rule can block: the default-branch rule and
+  # the catch-all override allow_failure with true.
+  allow_failure:
+    exit_codes: [75]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      allow_failure: false
+      when: always
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: always
+      allow_failure: true
+    - when: always
       allow_failure: true
 
 # Free-tier compatible Pages deployment on the default branch only.
@@ -125,25 +161,9 @@ perf-sentinel-pages-simple:
   stage: perf-sentinel
   image: debian:bookworm-slim
   dependencies:
+    - perf-sentinel-install
     - integration-tests
-  before_script:
-    - apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
-    - |
-      set -euo pipefail
-      BASE_URL="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${PERF_SENTINEL_VERSION}"
-      curl -sSLf -o perf-sentinel-linux-amd64 "${BASE_URL}/perf-sentinel-linux-amd64"
-      curl -sSLf -o SHA256SUMS.txt            "${BASE_URL}/SHA256SUMS.txt"
-      grep 'perf-sentinel-linux-amd64' SHA256SUMS.txt | sha256sum -c -
-      mkdir -p "${CI_PROJECT_DIR}/bin"
-      install -m 0755 perf-sentinel-linux-amd64 "${CI_PROJECT_DIR}/bin/perf-sentinel"
-      "${CI_PROJECT_DIR}/bin/perf-sentinel" --version
   script:
-    # Renders the trace file straight to HTML. Since 0.5.14 the binary
-    # honors its --help contract and auto-detects Jaeger inputs on the
-    # report path, no analyze-then-report dance is needed. The raw
-    # analyze JSON is also archived next to the HTML so downstream
-    # tooling (baseline diffing, dashboards, custom reports) can
-    # consume it without re-parsing the HTML.
     - |
       set -euo pipefail
       mkdir -p public/perf-sentinel-reports

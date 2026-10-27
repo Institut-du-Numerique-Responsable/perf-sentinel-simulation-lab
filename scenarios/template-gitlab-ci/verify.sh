@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Validate the upstream gitlab-ci.yml template at v0.13.1 end-to-end.
+# Validate the upstream gitlab-ci.yml template end-to-end, at the tag the
+# lab fixture pins.
 #
 # 4 steps:
 #
-# 1. Curl the upstream `docs/ci-templates/gitlab-ci.yml` at v0.13.1
-#    (override via UPSTREAM_VERSION).
+# 1. Curl the upstream `docs/ci-templates/gitlab-ci.yml` at the fixture's
+#    PERF_SENTINEL_VERSION tag (override via UPSTREAM_VERSION). Before that
+#    tag is published, fall back to the local perf-sentinel clone
+#    (PERF_SENTINEL_REPO_PATH), which is how a pre-release pass reads it.
 # 2. Lint the template via the GitLab CE CI Lint API
 #    (POST /api/v4/ci/lint). Asserts the YAML parses and the gitlab-ci
 #    schema is satisfied.
@@ -12,13 +15,17 @@
 #    `artifacts/fixtures/gitlab-ci-from-upstream.yml`. The lab fixture
 #    pins an older version (0.5.14 historically) and adds a dummy
 #    integration-tests job; check that the structural skeleton (stages,
-#    job names, key directives) still matches.
+#    job names, key directives) still matches, including the 0.35.0
+#    shape: a `.pre` install job picking the asset by `uname -m`, the
+#    Code Quality `check_name` and signature fingerprint, the line kept at
+#    1 or more, and the catch-all rules.
 # 4. Delegate to the existing verify-gitlab-perf-sentinel.sh which
 #    already exercises the full GitLab pipeline against the in-cluster
-#    GitLab CE. Surfaces its verdict.
+#    GitLab CE. Surfaces its verdict. SKIPPED when the pinned release has
+#    no published assets yet, since the seeded pipeline downloads them.
 #
 # Optional knobs:
-#   UPSTREAM_VERSION    override the version tag (default 0.13.1).
+#   UPSTREAM_VERSION    override the version tag (default: the fixture pin).
 #   UPSTREAM_PATH       override with a local copy of the template
 #                       (default fetches via curl).
 #   SKIP_E2E=1          skip step 4 (faster, lint+parity only).
@@ -32,6 +39,7 @@ SCENARIO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAB_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 LAB_FIXTURE="${LAB_ROOT}/artifacts/fixtures/gitlab-ci-from-upstream.yml"
 GITLAB_VERIFY="${LAB_ROOT}/scripts/verify-gitlab-perf-sentinel.sh"
+PERF_SENTINEL_REPO_PATH="${PERF_SENTINEL_REPO_PATH:-${HOME}/RustroverProjects/perf-sentinel}"
 
 # The tag whose template is fetched, derived from the fixture's own pin so a
 # bump happens in one place. Both have to name a PUBLISHED release: the seeded
@@ -73,10 +81,10 @@ else
   if curl -sSLf -o "${TMP_DIR}/upstream-gitlab-ci.yml" "${UPSTREAM_URL}" 2>/dev/null; then
     UPSTREAM_SOURCE="tag"
     ok "fetched ${UPSTREAM_URL}"
-  elif [ -f "${HOME}/RustroverProjects/perf-sentinel/docs/ci-templates/gitlab-ci.yml" ]; then
-    cp "${HOME}/RustroverProjects/perf-sentinel/docs/ci-templates/gitlab-ci.yml" \
+  elif [ -f "${PERF_SENTINEL_REPO_PATH}/docs/ci-templates/gitlab-ci.yml" ]; then
+    cp "${PERF_SENTINEL_REPO_PATH}/docs/ci-templates/gitlab-ci.yml" \
        "${TMP_DIR}/upstream-gitlab-ci.yml"
-    warn "curl failed, fell back to ${HOME}/RustroverProjects/perf-sentinel/docs/ci-templates/gitlab-ci.yml"
+    warn "curl failed, fell back to ${PERF_SENTINEL_REPO_PATH}/docs/ci-templates/gitlab-ci.yml"
   else
     die "cannot fetch upstream template, set UPSTREAM_PATH=/path/to/gitlab-ci.yml"
   fi
@@ -168,6 +176,29 @@ else
   warn "parity invariants FAIL (upstream perf-job=${UPSTREAM_HAS_PERF_JOB} fixture=${FIXTURE_HAS_PERF_JOB})"
 fi
 
+# The 0.35.0 template shape, required in both files. Each pattern is one
+# directive the 0.34.x template lacked or got wrong: install in its own `.pre`
+# job, asset picked by architecture (amd64 only before), Code Quality entries
+# with a check_name and the finding signature as fingerprint (a trace-scoped
+# fingerprint before, so GitLab never matched a baseline), a line of 1 or more,
+# and a catch-all rule so a branch push without a merge request runs too.
+SHAPE_MISSING=()
+for pat in '^perf-sentinel-install:' 'stage: \.pre' 'case "\$\(uname -m\)" in' \
+           'perf-sentinel-linux-arm64' 'check_name: \.type' 'fingerprint: \.signature' \
+           'else 1 end' '^    - when: (always|on_success)$' 'exit_codes: \[75\]'; do
+  for f in "${TMP_DIR}/upstream-gitlab-ci.yml" "${LAB_FIXTURE}"; do
+    grep -qE -- "${pat}" "${f}" || SHAPE_MISSING+=("$(basename "${f}"): ${pat}")
+  done
+done
+if [ "${#SHAPE_MISSING[@]}" -eq 0 ]; then
+  SHAPE_NOTE="present in both"
+  ok "0.35.0 shape PASS (.pre install by arch, check_name, signature fingerprint, line >= 1, catch-all)"
+else
+  PARITY_VERDICT="FAIL"
+  SHAPE_NOTE="missing: ${SHAPE_MISSING[*]}"
+  warn "0.35.0 shape FAIL, ${SHAPE_NOTE}"
+fi
+
 UPSTREAM_VERSION_PINNED=$(grep -oE 'PERF_SENTINEL_VERSION:\s*"[0-9.]+"' "${TMP_DIR}/upstream-gitlab-ci.yml" || true)
 FIXTURE_VERSION_PINNED=$(grep -oE 'PERF_SENTINEL_VERSION:\s*"[0-9.]+"' "${LAB_FIXTURE}" || true)
 # The seeded pipeline downloads and runs the release binary the FIXTURE names, so
@@ -189,7 +220,11 @@ E2E_NOTE="SKIP_E2E=1"
 
 if [ "${SKIP_E2E:-0}" != "1" ]; then
   if [ -x "${GITLAB_VERIFY}" ] || [ -f "${GITLAB_VERIFY}" ]; then
-    if curl -sf "${GITLAB_URL}/-/readiness" >/dev/null 2>&1 && [ -f "${PAT_FILE}" ]; then
+    PIN_ASSETS="https://github.com/Institut-du-Numerique-Responsable/perf-sentinel/releases/download/v${FIXTURE_PIN}/SHA256SUMS.txt"
+    if ! curl -sfIL -o /dev/null "${PIN_ASSETS}" 2>/dev/null; then
+      E2E_NOTE="v${FIXTURE_PIN:-?} has no published release assets yet, the seeded pipeline would download nothing"
+      warn "${E2E_NOTE}"
+    elif curl -sf "${GITLAB_URL}/-/readiness" >/dev/null 2>&1 && [ -f "${PAT_FILE}" ]; then
       ok "running ${GITLAB_VERIFY}"
       if bash "${GITLAB_VERIFY}" > "${TMP_DIR}/e2e.log" 2>&1; then
         E2E_VERDICT="PASS"
@@ -251,6 +286,8 @@ Lab fixture: ${LAB_FIXTURE}
 - fixture perf-sentinel job: ${FIXTURE_HAS_PERF_JOB} hit(s)
 - --ci flag: upstream=${UPSTREAM_HAS_CI_FLAG}, fixture=${FIXTURE_HAS_CI_FLAG}
 - SARIF: upstream=${UPSTREAM_HAS_SARIF}, fixture=${FIXTURE_HAS_SARIF}
+- 0.35.0 shape: ${SHAPE_NOTE}
+- upstream source: ${UPSTREAM_SOURCE}
 - version pin: upstream ${UPSTREAM_VERSION_PINNED:-?}, fixture ${FIXTURE_VERSION_PINNED:-?}
 
 ## Step 4: end-to-end
