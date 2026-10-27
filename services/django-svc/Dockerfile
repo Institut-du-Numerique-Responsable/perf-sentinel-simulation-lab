@@ -7,7 +7,7 @@
 #
 # Build with:  docker build -t django-svc:s1 services/django-svc
 
-FROM python:3.14-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 WORKDIR /app
 
 COPY requirements.txt requirements.lock ./
@@ -16,7 +16,7 @@ RUN test "$(sha256sum requirements.txt | cut -d ' ' -f 1)" = "$(sed -n 's/^# req
 
 COPY djangosvc ./djangosvc
 
-FROM python:3.14-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 RUN useradd -r -u 65532 -d /app nonroot
 WORKDIR /app

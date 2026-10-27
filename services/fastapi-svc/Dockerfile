@@ -1,7 +1,7 @@
 # fastapi-svc Dockerfile. Single-stage (python slim for asyncpg binary).
 # Build with:  docker build -t fastapi-svc:s1 services/fastapi-svc
 
-FROM python:3.14-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 RUN useradd -r -u 65532 -d /app nonroot
 WORKDIR /app

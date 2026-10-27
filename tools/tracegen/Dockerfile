@@ -1,6 +1,6 @@
 # tracegen: parameterized OTLP load generator with I/O semantics.
 # Built and imported into k3d by scripts/seed-tracegen.sh, never pulled.
-FROM python:3.14-slim
+FROM python:3.15-slim
 
 WORKDIR /app
 COPY requirements.txt .
