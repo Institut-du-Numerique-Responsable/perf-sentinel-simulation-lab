@@ -64,7 +64,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: rabbitmq
-          image: rabbitmq:4.3.6-management-alpine
+          image: rabbitmq:4.4.0-management-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - name: amqp
