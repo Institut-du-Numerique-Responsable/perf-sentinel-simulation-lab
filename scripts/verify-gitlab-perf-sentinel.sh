@@ -116,8 +116,15 @@ for j in json.load(sys.stdin):
 }
 
 step "1. Push a commit on main and observe the pipeline"
+# ci-e2e-gitlab pushes its own pipeline into this shared project. Put the
+# seeded files back so this run tests the upstream template whatever ran
+# before it.
+FIXTURES_DIR="${REPO_ROOT}/artifacts/fixtures"
+cp "${FIXTURES_DIR}/em-real-time-traces.json" test-traces.json
+cp "${FIXTURES_DIR}/perf-sentinel-test.toml"  .perf-sentinel.toml
+cp "${FIXTURES_DIR}/gitlab-ci-from-upstream.yml" .gitlab-ci.yml
 echo "lab verify $(date -u +%FT%TZ)" >> README.md
-git add README.md
+git add README.md test-traces.json .perf-sentinel.toml .gitlab-ci.yml
 git commit -q -m "verify: bump README"
 git push -q origin HEAD:main
 SHA_MAIN="$(git rev-parse HEAD)"
