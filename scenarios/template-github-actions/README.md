@@ -12,7 +12,7 @@ make verify-template-github-actions
 SKIP_RUNTIME=1 make verify-template-github-actions
 
 # Override version:
-UPSTREAM_VERSION=0.5.18 make verify-template-github-actions
+UPSTREAM_VERSION=0.35.0 make verify-template-github-actions
 
 # Use a local copy:
 UPSTREAM_PATH=~/perf-sentinel/docs/ci-templates/github-actions.yml \
@@ -23,7 +23,7 @@ Report at `/tmp/scenario-template-github-actions-report.md`.
 
 ## What it validates
 
-1. **Fetch**. Curl upstream at the pinned `UPSTREAM_VERSION`, fallback to local clone.
+1. **Fetch**. Curl upstream at the pinned `UPSTREAM_VERSION`, fallback to the local clone at `PERF_SENTINEL_REPO_PATH` (the pre-release path, before the tag exists).
 2. **Structural lint**:
    - YAML parses (python `yaml.safe_load`).
    - Top-level keys present: `name`, `on`, `permissions`, `jobs`.
@@ -31,6 +31,7 @@ Report at `/tmp/scenario-template-github-actions-report.md`.
    - `perf-sentinel analyze` step.
    - `--ci` quality-gate flag.
    - `github/codeql-action/upload-sarif` step.
+   - the template's `PERF_SENTINEL_VERSION` equals `UPSTREAM_VERSION`.
    - `uses:` declarations pinned to 40-character commit SHAs (no
      floating tags). Warning if any are unpinned.
    - Quality gate enforcement step.

@@ -14,7 +14,7 @@ make verify-template-jenkinsfile
 SKIP_RUNTIME=1 make verify-template-jenkinsfile
 
 # Override version:
-UPSTREAM_VERSION=0.5.18 make verify-template-jenkinsfile
+UPSTREAM_VERSION=0.35.0 make verify-template-jenkinsfile
 
 # Use a local copy:
 UPSTREAM_PATH=~/perf-sentinel/docs/ci-templates/jenkinsfile.groovy \
@@ -25,7 +25,7 @@ Report at `/tmp/scenario-template-jenkinsfile-report.md`.
 
 ## What it validates
 
-1. **Fetch**. Curl upstream at the pinned `UPSTREAM_VERSION`, fallback to local clone.
+1. **Fetch**. Curl upstream at the pinned `UPSTREAM_VERSION`, fallback to the local clone at `PERF_SENTINEL_REPO_PATH` (the pre-release path, before the tag exists).
 2. **Structural lint**. Check that the declarative pipeline skeleton is
    present and well-formed:
    - `pipeline { ... }`
@@ -34,7 +34,11 @@ Report at `/tmp/scenario-template-jenkinsfile-report.md`.
    - `--ci` quality-gate flag
    - SARIF output reference
    - `archiveArtifacts` step (warned if missing)
-   - `PERF_SENTINEL_VERSION` pin (no floating tags)
+   - `PERF_SENTINEL_VERSION` pin (no floating tags), equal to `UPSTREAM_VERSION`
+   - the 0.35.0 shape, read on the code lines only: `Install perf-sentinel`
+     is the first stage, the asset is picked by `uname -m` (arm64 included),
+     the reports a reused workspace keeps are removed first, and every
+     multi-line `sh` block sets `set -eu`, never `pipefail`
 3. **Best-effort runtime**. Pull `jenkins/jenkinsfile-runner:latest`
    container and execute the pipeline against a small fixture trace.
    This step is environment-fragile (Java init, plugin downloads,

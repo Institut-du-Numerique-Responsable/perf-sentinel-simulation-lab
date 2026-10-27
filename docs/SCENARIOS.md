@@ -1364,7 +1364,9 @@ once the release is published. `template-gitlab-ci` derives that tag
 from its own fixture pin and fails the parity step when the two
 disagree, because its seeded pipeline downloads and runs that release
 binary. The other two run no perf-sentinel binary and stay on
-`UPSTREAM_VERSION`, default 0.13.1.
+`UPSTREAM_VERSION`, default 0.35.0. All three fall back to the local
+clone at `PERF_SENTINEL_REPO_PATH` while the tag does not exist yet, which
+is how a pre-release pass validates the templates it is about to ship.
 
 ### ci-shift-left (primary)
 
@@ -1443,9 +1445,11 @@ SKIP_E2E=1 make verify-template-gitlab-ci  # lint + parity only
 Note: upstream filename is `jenkinsfile.groovy` (lowercase, .groovy
 extension), NOT `Jenkinsfile`. Multibranch Pipeline accepts both.
 
-1. Curl upstream `jenkinsfile.groovy` at v0.13.1 (`UPSTREAM_VERSION`).
+1. Curl upstream `jenkinsfile.groovy` at v0.35.0 (`UPSTREAM_VERSION`).
 2. Structural lint (declarative pipeline skeleton, `analyze`, `--ci`,
-   SARIF, version pin).
+   SARIF, version pin equal to `UPSTREAM_VERSION`) and the 0.35.0 shape:
+   install as the first stage, asset by `uname -m`, reused workspace
+   cleared, `set -eu` in every `sh` block and no `pipefail`.
 3. Best-effort runtime via `jenkins/jenkinsfile-runner` containerised.
    SKIP gracefully on environment failures (Java init, plugin
    downloads, binary release URL not reachable).
@@ -1457,9 +1461,10 @@ SKIP_RUNTIME=1 make verify-template-jenkinsfile
 
 ### template-github-actions
 
-1. Curl upstream `github-actions.yml` at v0.13.1 (`UPSTREAM_VERSION`).
+1. Curl upstream `github-actions.yml` at v0.35.0 (`UPSTREAM_VERSION`).
 2. Structural lint (YAML parse, top-level keys, install + analyze +
-   `--ci` + SARIF upload, action SHAs pinned to 40-char commits).
+   `--ci` + SARIF upload, action SHAs pinned to 40-char commits, the
+   template's own pin equal to `UPSTREAM_VERSION`).
 3. `nektos/act --list` parse-only check (no execution).
 
 ```bash

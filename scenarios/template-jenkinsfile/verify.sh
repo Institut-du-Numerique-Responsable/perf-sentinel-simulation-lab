@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate the upstream jenkinsfile.groovy template at v0.13.1.
+# Validate the upstream jenkinsfile.groovy template at v0.35.0.
 #
 # Note on filename: upstream ships `jenkinsfile.groovy` (lowercase, .groovy),
 # NOT `Jenkinsfile`. The Jenkins Multibranch Pipeline plugin accepts the
@@ -7,10 +7,16 @@
 #
 # 3 steps:
 #
-# 1. Fetch upstream `docs/ci-templates/jenkinsfile.groovy` at v0.13.1.
+# 1. Fetch upstream `docs/ci-templates/jenkinsfile.groovy` at v0.35.0, or
+#    from the local perf-sentinel clone (PERF_SENTINEL_REPO_PATH) before
+#    that tag is published.
 # 2. Structural lint: assert the declarative pipeline skeleton
 #    (`pipeline { agent ... stages { ... } }`), the perf-sentinel install
-#    + analyze stages, and the `--ci` quality-gate enforcement step.
+#    + analyze stages, and the `--ci` quality-gate enforcement step. Plus
+#    the 0.35.0 shape from a real Jenkins trial: the install stage comes
+#    first, picks the asset by `uname -m`, clears the files a reused
+#    workspace keeps, and every `sh` block sets `set -eu`, never
+#    `set -o pipefail`, which Debian 12's dash rejects.
 # 3. Best-effort runtime via `jenkinsfile-runner` containerised. This
 #    runner can be flaky (Java init, plugin downloads) and the upstream
 #    template downloads a Linux binary from GitHub Releases that may not
@@ -18,7 +24,7 @@
 #    clear note.
 #
 # Optional knobs:
-#   UPSTREAM_VERSION    override the version tag (default 0.13.1).
+#   UPSTREAM_VERSION    override the version tag (default 0.35.0).
 #   UPSTREAM_PATH       use a local copy of the template.
 #   SKIP_RUNTIME=1      skip step 3 (lint + structural only).
 
@@ -30,7 +36,8 @@ TMP_DIR="/tmp/${SCENARIO}"
 SCENARIO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAB_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 
-UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.13.1}"
+UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.35.0}"
+PERF_SENTINEL_REPO_PATH="${PERF_SENTINEL_REPO_PATH:-${HOME}/RustroverProjects/perf-sentinel}"
 UPSTREAM_URL="https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/jenkinsfile.groovy"
 # jenkinsfile-runner has no recent stable tag on Docker Hub, only :latest carries a digest.
 # Pinning the digest of latest gives immutability even though the tag pointer is mutable.
@@ -55,10 +62,10 @@ if [ -n "${UPSTREAM_PATH:-}" ] && [ -f "${UPSTREAM_PATH}" ]; then
   ok "using local copy at ${UPSTREAM_PATH}"
 elif curl -sSLf -o "${TMP_DIR}/Jenkinsfile" "${UPSTREAM_URL}" 2>/dev/null; then
   ok "fetched ${UPSTREAM_URL}"
-elif [ -f "${HOME}/RustroverProjects/perf-sentinel/docs/ci-templates/jenkinsfile.groovy" ]; then
-  cp "${HOME}/RustroverProjects/perf-sentinel/docs/ci-templates/jenkinsfile.groovy" \
+elif [ -f "${PERF_SENTINEL_REPO_PATH}/docs/ci-templates/jenkinsfile.groovy" ]; then
+  cp "${PERF_SENTINEL_REPO_PATH}/docs/ci-templates/jenkinsfile.groovy" \
      "${TMP_DIR}/Jenkinsfile"
-  warn "curl failed, fell back to local clone"
+  warn "curl failed, fell back to ${PERF_SENTINEL_REPO_PATH}"
 else
   die "cannot fetch upstream jenkinsfile.groovy, set UPSTREAM_PATH"
 fi
@@ -94,8 +101,33 @@ else
   ok "version pin: ${PERF_VERSION_PIN}"
 fi
 
+[ "${PERF_VERSION_PIN//[^0-9.]/}" = "${UPSTREAM_VERSION}" ] \
+  || die "template pins ${PERF_VERSION_PIN:-nothing}, expected ${UPSTREAM_VERSION}"
+
+# The 0.35.0 shape. Code-only view first: the template's comments quote the
+# very commands this checks, so grepping the raw file would match prose.
+grep -vE '^\s*//' "${TMP_DIR}/Jenkinsfile" > "${TMP_DIR}/Jenkinsfile.code"
+JF="${TMP_DIR}/Jenkinsfile.code"
+INSTALL_LINE=$(grep -nE "stage\('Install perf-sentinel'\)" "${JF}" | head -1 | cut -d: -f1)
+ANALYZE_LINE=$(grep -nE "stage\('perf-sentinel analyze'\)" "${JF}" | head -1 | cut -d: -f1)
+[ -n "${INSTALL_LINE}" ] && [ -n "${ANALYZE_LINE}" ] && [ "${INSTALL_LINE}" -lt "${ANALYZE_LINE}" ] \
+  || die "install stage must come before analyze (install=${INSTALL_LINE:-none}, analyze=${ANALYZE_LINE:-none})"
+FIRST_STAGE=$(grep -oE "stage\('[^']+'\)" "${JF}" | head -1)
+[ "${FIRST_STAGE}" = "stage('Install perf-sentinel')" ] \
+  || die "first stage is ${FIRST_STAGE:-none}, the tests need the binary installed before them"
+grep -qE 'case "\$\(uname -m\)" in' "${JF}" || die "no asset pick by uname -m"
+grep -qE 'aarch64\|arm64\) ASSET=perf-sentinel-linux-arm64' "${JF}" || die "no arm64 asset branch"
+grep -qE "rm -f .*perf-sentinel-results\.sarif.*perf-sentinel-report\.json" "${JF}" \
+  || die "no cleanup of the reports a reused workspace keeps"
+grep -qE 'set -o pipefail|set -euo pipefail' "${JF}" && die "a sh block sets pipefail, which dash on Debian 12 rejects"
+SH_BLOCKS=$(grep -cE "sh '''" "${JF}")
+SET_EU=$(grep -cE '^\s*set -eu$' "${JF}")
+[ "${SH_BLOCKS}" -gt 0 ] && [ "${SET_EU}" -eq "${SH_BLOCKS}" ] \
+  || die "set -eu in ${SET_EU} of ${SH_BLOCKS} multi-line sh blocks"
+ok "0.35.0 shape: install first, asset by uname -m, workspace cleared, set -eu in ${SET_EU}/${SH_BLOCKS} sh blocks"
+
 STRUCTURAL_VERDICT="PASS"
-ok "structural invariants PASS (pipeline, stages, analyze, --ci, sarif)"
+ok "structural invariants PASS (pipeline, stages, analyze, --ci, sarif, 0.35.0 shape)"
 
 step "3. Best-effort runtime via jenkinsfile-runner"
 
@@ -184,6 +216,7 @@ Filename: jenkinsfile.groovy (NOT Jenkinsfile, lowercase + .groovy ext)
 - skeleton: pipeline { stages { ... } } present
 - analyze + --ci + sarif: present
 - version pin: ${PERF_VERSION_PIN:-?}
+- 0.35.0 shape: install first, asset by uname -m, workspace cleared, set -eu everywhere
 
 ## Step 3: runtime via jenkinsfile-runner
 
