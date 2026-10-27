@@ -220,21 +220,58 @@ else
   warn "signature populated on ${WITH_SIG}/${ANALYZED_COUNT} findings"
 fi
 
-if python3 -c "
+# Two layers. The structural check always runs, in stdlib python, on the parts
+# GitHub code scanning rejected before 0.35.0: a result-level logicalLocations
+# and a fixes[] without artifactChanges both failed SARIF 2.1.0, as did a
+# startLine of 0. Checking version and tool name alone let that ship.
+# The full OASIS schema then runs when check-jsonschema and the schema the
+# engine vendors since 0.35.0 are both present; without them the check is
+# structural only, and the report says so.
+SARIF_SCHEMA="${SARIF_SCHEMA:-${PERF_SENTINEL_REPO_PATH:-${HOME}/RustroverProjects/perf-sentinel}/tests/fixtures/sarif-schema-2.1.0.json}"
+SARIF_SCHEMA_NOTE="structural only (check-jsonschema or ${SARIF_SCHEMA} missing)"
+if python3 - "${TMP_DIR}/regression.sarif" > "${TMP_DIR}/sarif-check.log" 2>&1 <<'PY'
 import json, sys
-sarif = json.load(open('${TMP_DIR}/regression.sarif'))
-assert sarif.get('version') == '2.1.0', f'unexpected version: {sarif.get(\"version\")}'
+sarif = json.load(open(sys.argv[1]))
+assert sarif.get('version') == '2.1.0', f"unexpected version: {sarif.get('version')}"
 runs = sarif.get('runs', [])
 assert runs, 'no runs in SARIF'
 assert runs[0]['tool']['driver']['name'] == 'perf-sentinel'
-print(f'sarif valid, {sum(len(r.get(\"results\", [])) for r in runs)} results')
-" > "${TMP_DIR}/sarif-check.log" 2>&1
+results = [r for run in runs for r in run.get('results', [])]
+assert results, 'no results, the shape checks below would pass on nothing'
+for i, r in enumerate(results):
+    where = f"result {i} ({r.get('ruleId')})"
+    assert 'logicalLocations' not in r, f'{where}: logicalLocations at result level'
+    assert 'fixes' not in r, f'{where}: fixes[] present'
+    locs = r.get('locations')
+    assert isinstance(locs, list) and len(locs) == 1, f'{where}: want exactly 1 location, got {locs!r}'
+    logical = locs[0].get('logicalLocations')
+    assert isinstance(logical, list) and len(logical) == 2, f'{where}: want 2 logicalLocations, got {logical!r}'
+    fix = r.get('properties', {}).get('suggestedFix')
+    assert fix is None or isinstance(fix, str), f'{where}: suggestedFix is not a string: {fix!r}'
+    region = (locs[0].get('physicalLocation') or {}).get('region')
+    if region is not None:
+        assert region.get('startLine', 1) >= 1, f"{where}: startLine {region.get('startLine')}"
+print(f'sarif shape ok, {len(results)} results')
+PY
 then
   ASSERT_SARIF="PASS"
-  ok "assertion SARIF schema PASS ($(cat "${TMP_DIR}/sarif-check.log"))"
+  if command -v check-jsonschema >/dev/null && [ -f "${SARIF_SCHEMA}" ]; then
+    if check-jsonschema --schemafile "${SARIF_SCHEMA}" "${TMP_DIR}/regression.sarif" \
+         >> "${TMP_DIR}/sarif-check.log" 2>&1; then
+      SARIF_SCHEMA_NOTE="valid against the SARIF 2.1.0 schema"
+    else
+      ASSERT_SARIF="FAIL"
+      SARIF_SCHEMA_NOTE="rejected by the SARIF 2.1.0 schema"
+    fi
+  fi
 else
   ASSERT_SARIF="FAIL"
-  warn "SARIF schema check failed, see ${TMP_DIR}/sarif-check.log"
+  SARIF_SCHEMA_NOTE="structural check failed"
+fi
+if [ "${ASSERT_SARIF}" = "PASS" ]; then
+  ok "assertion SARIF schema PASS ($(head -1 "${TMP_DIR}/sarif-check.log"), ${SARIF_SCHEMA_NOTE})"
+else
+  warn "SARIF ${SARIF_SCHEMA_NOTE}, see ${TMP_DIR}/sarif-check.log"
 fi
 
 # === Phase 3: ack workflow ===
@@ -356,7 +393,7 @@ Trace fixture: ${TRACES_FIXTURE}
 - gate: ${REG_GATE} (FAIL expected)
 - assertion >5 findings: ${ASSERT_COUNT}
 - assertion signature on every finding (0.5.17): ${ASSERT_SIG} (${WITH_SIG}/${ANALYZED_COUNT})
-- assertion SARIF schema: ${ASSERT_SARIF}
+- assertion SARIF schema: ${ASSERT_SARIF} (${SARIF_SCHEMA_NOTE})
 
 ## Phase 3: ack workflow
 

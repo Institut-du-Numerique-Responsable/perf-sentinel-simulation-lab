@@ -52,8 +52,14 @@ Report lands at `/tmp/scenario-ci-shift-left-report.md`. Wall clock
    - More than 5 active findings.
    - Every finding has a non-empty `signature` field (0.5.17 feature
      `enrich_with_signatures()`, `crates/sentinel-core/src/detect/mod.rs`).
-   - SARIF parses against the 2.1.0 schema with `tool.driver.name ==
-     perf-sentinel`.
+   - SARIF is version 2.1.0 with `tool.driver.name == perf-sentinel`, and
+     every result has the 0.35.0 shape: no result-level `logicalLocations`,
+     no `fixes`, exactly one location carrying two `logicalLocations`,
+     `properties.suggestedFix` a string when present, no `startLine` below 1
+     (stdlib python, always run). When `check-jsonschema` is installed and the
+     engine checkout carries `tests/fixtures/sarif-schema-2.1.0.json`, the file
+     is also validated against the full OASIS schema (override the path with
+     `SARIF_SCHEMA`); otherwise the report says the check was structural only.
 
 ### Phase 3: ack workflow
 

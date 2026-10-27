@@ -1376,7 +1376,12 @@ Canonical 3-phase use case:
 2. **Regression**: `make validate-findings` (the 10 fault scripts)
    drives anti-patterns, daemon exports, `analyze --ci` fails the
    gate, JSON + SARIF emitted, signature field asserted on every
-   finding (0.5.17 feature).
+   finding (0.5.17 feature). The SARIF is held to the 0.35.0 shape in
+   stdlib python (no result-level `logicalLocations`, no `fixes`, one
+   location with two `logicalLocations`, a string `suggestedFix`, no
+   `startLine` below 1), then to the full SARIF 2.1.0 schema when
+   `check-jsonschema` and the engine's vendored
+   `tests/fixtures/sarif-schema-2.1.0.json` are both available.
 3. **Acked**: signatures from phase 2 written into
    `.perf-sentinel-acknowledgments.toml`, re-analyze with
    `--acknowledgments`. Gate passes (0.5.17 acks excluded), 0 active
