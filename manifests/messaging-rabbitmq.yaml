@@ -164,7 +164,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: toxiproxy
-          image: ghcr.io/shopify/toxiproxy:2.12.0
+          image: ghcr.io/shopify/toxiproxy:2.13.0
           imagePullPolicy: IfNotPresent
           args:
             - -host=0.0.0.0
