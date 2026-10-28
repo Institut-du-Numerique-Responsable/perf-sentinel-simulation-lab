@@ -224,6 +224,9 @@ fi
 # GitHub code scanning rejected before 0.35.0: a result-level logicalLocations
 # and a fixes[] without artifactChanges both failed SARIF 2.1.0, as did a
 # startLine of 0. Checking version and tool name alone let that ship.
+# Since 0.36.0 a location also needs a physicalLocation: a valid one without it
+# made the Warnings NG parser drop the whole file (see sarif-warnings-ng), so
+# service and endpoint moved to properties.
 # The full OASIS schema then runs when check-jsonschema and the schema the
 # engine vendors since 0.35.0 are both present; without them the check is
 # structural only, and the report says so.
@@ -242,16 +245,22 @@ for i, r in enumerate(results):
     where = f"result {i} ({r.get('ruleId')})"
     assert 'logicalLocations' not in r, f'{where}: logicalLocations at result level'
     assert 'fixes' not in r, f'{where}: fixes[] present'
-    locs = r.get('locations')
-    assert isinstance(locs, list) and len(locs) == 1, f'{where}: want exactly 1 location, got {locs!r}'
-    logical = locs[0].get('logicalLocations')
-    assert isinstance(logical, list) and len(logical) == 2, f'{where}: want 2 logicalLocations, got {logical!r}'
-    fix = r.get('properties', {}).get('suggestedFix')
+    props = r.get('properties', {})
+    for key in ('service', 'endpoint'):
+        assert isinstance(props.get(key), str) and props[key], f'{where}: properties.{key} missing: {props.get(key)!r}'
+    locs = r.get('locations', [])
+    assert isinstance(locs, list) and len(locs) <= 1, f'{where}: want at most 1 location, got {locs!r}'
+    for loc in locs:
+        assert 'physicalLocation' in loc, f'{where}: location without physicalLocation'
+        logical = loc.get('logicalLocations')
+        assert isinstance(logical, list) and len(logical) == 2, f'{where}: want 2 logicalLocations, got {logical!r}'
+        region = loc['physicalLocation'].get('region')
+        if region is not None:
+            assert region.get('startLine', 1) >= 1, f"{where}: startLine {region.get('startLine')}"
+    fix = props.get('suggestedFix')
     assert fix is None or isinstance(fix, str), f'{where}: suggestedFix is not a string: {fix!r}'
-    region = (locs[0].get('physicalLocation') or {}).get('region')
-    if region is not None:
-        assert region.get('startLine', 1) >= 1, f"{where}: startLine {region.get('startLine')}"
-print(f'sarif shape ok, {len(results)} results')
+located = sum(1 for r in results if r.get('locations'))
+print(f'sarif shape ok, {len(results)} results, {located} with a location')
 PY
 then
   ASSERT_SARIF="PASS"
