@@ -24,7 +24,7 @@ A local Hub knows three sources, and both daemons receive the same N+1
 
 | id | assertion |
 |----|-----------|
-| H1 | for the same 8 detections, `hdv-poll` (poll alone) and `hdv-push` (push alone) both serve exactly 8 |
+| H1 | each daemon counts the same 8 detections itself, and `hdv-poll` (poll alone) and `hdv-push` (push alone) both serve exactly 8 |
 | H2 | daemon A restarts (a new `ledger_id`) and takes 5 more: its own ledger counts 5, the Hub serves 13 for `hdv-poll`, with `restart` in `detections_gaps`, `detections_complete: false`, and no `multi_instance` for two successive ledgers |
 | H3 | `hdv-pods` reads two ledgers alive at once and carries `multi_instance`, `hdv-push` does not |
 | H4 | the finding's `detections` is the sum of its sources, and incomplete |
@@ -52,6 +52,10 @@ No cluster, no Docker, no outbound call (`Hub:UpdateCheck` is off). Ports
 14960 to 14966 (`HDV_BASE_PORT`). About 90 seconds, most of it the daemon's
 detection push, at most once a minute. `KEEP_TMP=yes` keeps the logs. Report
 at `/tmp/scenario-hub-detection-volume-report.md`.
+
+The scenario SKIPs with exit 0, rather than failing, when the daemon binary, the Hub
+build, `dotnet` or `opentelemetry-proto` is absent. A port already answering is a
+failure.
 
 ## What it found (2026-10-28)
 

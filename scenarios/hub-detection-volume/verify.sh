@@ -46,10 +46,14 @@ IMPORT_KEY="$(python3 -c 'print("h" * 40)')"
 
 color_blue()  { printf "\033[34m%s\033[0m\n" "$*"; }
 color_green() { printf "\033[32m%s\033[0m\n" "$*"; }
+color_yellow() { printf "\033[33m%s\033[0m\n" "$*"; }
 color_red()   { printf "\033[31m%s\033[0m\n" "$*"; }
 step() { color_blue "==> $*"; }
 ok()   { color_green "    ok: $*"; }
 die()  { color_red   "    error: $*"; cat "${REPORT}" 2>/dev/null || true; exit 1; }
+# A machine without a prerequisite skips with exit 0, as the other self-contained scenarios do.
+# The trap is dropped first: nothing has started, and its cleanup is not written for that.
+skip() { color_yellow "    skip: $*, scenario skipped"; trap - EXIT; rm -rf "${TMP_DIR}"; exit 0; }
 
 PIDS=()
 A_PID=""
@@ -70,12 +74,14 @@ wait_http() {  # $1 = url, $2 = what
 }
 
 step "Prerequisites"
-[ -x "${PERF_SENTINEL_LOCAL_BIN}" ] || die "no daemon binary at ${PERF_SENTINEL_LOCAL_BIN}"
-[ -f "${HUB_DLL}" ] || die "no Hub build at ${HUB_DLL} (dotnet build PerfSentinelHub.sln -c Release, or set PERF_SENTINEL_HUB_DLL)"
-command -v dotnet >/dev/null || die "dotnet not on PATH, the Hub runs as a local process"
+[ -x "${PERF_SENTINEL_LOCAL_BIN}" ] \
+  || skip "no daemon binary at ${PERF_SENTINEL_LOCAL_BIN} (cargo build --release in ${PERF_SENTINEL_REPO_PATH})"
+[ -f "${HUB_DLL}" ] \
+  || skip "no Hub build at ${HUB_DLL} (dotnet build PerfSentinelHub.sln -c Release, or set PERF_SENTINEL_HUB_DLL)"
+command -v dotnet >/dev/null || skip "dotnet not on PATH, the Hub runs as a local process"
 python3 -c 'import opentelemetry.proto' 2>/dev/null \
-  || die "the OTLP payload needs opentelemetry-proto: pip install opentelemetry-proto"
-for port in "${HUB_PORT}" "${A_HTTP}" "${B_HTTP}" "${PROXY_PORT}" "${CLOSED_PORT}"; do
+  || skip "the OTLP payload needs opentelemetry-proto (pip install opentelemetry-proto)"
+for port in "${HUB_PORT}" "${A_HTTP}" "${A_GRPC}" "${B_HTTP}" "${B_GRPC}" "${PROXY_PORT}" "${CLOSED_PORT}"; do
   python3 -c "import socket,sys; socket.create_connection(('127.0.0.1', int(sys.argv[1])), 1)" "${port}" 2>/dev/null \
     && die "port ${port} already answers, stop that process or set HDV_BASE_PORT"
 done
@@ -266,9 +272,9 @@ q = urllib.parse.urlencode({"signature": sig, "from": frm, "to": int(time.time()
 try:
     rows = json.load(urllib.request.urlopen(url + "/api/findings?" + q, timeout=10))
 except Exception as e:  # a failed read is retried by the caller, never fatal here
-    print(json.dumps({"listed": False, "error": str(e)})); sys.exit()
+    print(json.dumps({"listed": False, "sources": {}, "error": str(e)})); sys.exit()
 if not rows:
-    print(json.dumps({"listed": False})); sys.exit()
+    print(json.dumps({"listed": False, "sources": {}})); sys.exit()
 f = rows[0]
 pick = lambda o: {k: o.get(k, "absent") for k in ("detections", "detections_complete", "detections_gaps")}
 print(json.dumps({"listed": True, "finding": pick(f), "sources": {s["id"]: pick(s) for s in f.get("sources", [])}}))
@@ -290,7 +296,13 @@ for _ in $(seq 1 40); do
   sleep 0.5
 done
 [ "${A_COUNT}" = "${K1}" ] || die "daemon A counts ${A_COUNT} planted detections, want ${K1}"
-read -r _ B_COUNT B_SIG <<< "$(daemon_planted "${B_HTTP}")"
+B_COUNT=0; B_SIG="-"
+for _ in $(seq 1 40); do
+  read -r _ B_COUNT B_SIG <<< "$(daemon_planted "${B_HTTP}")"
+  [ "${B_COUNT}" = "${K1}" ] && break
+  sleep 0.5
+done
+[ "${B_COUNT}" = "${K1}" ] || die "daemon B counts ${B_COUNT} planted detections, want ${K1}"
 [ "${B_SIG}" = "${SIG}" ] || die "daemons A and B disagree on the signature: ${SIG} vs ${B_SIG}"
 ok "both daemons count ${K1}, signature ${SIG}"
 

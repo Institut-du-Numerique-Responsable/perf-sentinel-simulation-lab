@@ -3607,7 +3607,8 @@ second episode alone, the same read an incident's detail makes in the launcher.
 `make verify-hub-detection-volume`. Self-contained: a Release build of the Hub run as a local
 `dotnet` process, two 0.37.0 daemons from the local binary, python3 with `opentelemetry-proto`,
 curl. No cluster, no Docker, about 90 seconds, most of it the daemon's detection push, at most
-once a minute.
+once a minute. It SKIPs with exit 0 when the daemon binary, the Hub build, `dotnet` or
+`opentelemetry-proto` is absent.
 
 The `detection-volume` scenario proves the daemon's ledger, the Hub's tests prove the fold, and
 neither sees the other. The Hub knows three sources: `hdv-poll` polls daemon A, `hdv-push`
