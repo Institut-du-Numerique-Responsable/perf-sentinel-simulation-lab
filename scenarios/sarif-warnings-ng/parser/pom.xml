@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pulls the parser Jenkins Warnings NG runs on a SARIF file: analysis-model,
+     whose SarifAdapter delegates to violations-lib. Only dependencies are
+     copied, nothing is built: ParseSarif.java runs as a single-file program. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>perf-sentinel-lab</groupId>
+  <artifactId>sarif-warnings-ng</artifactId>
+  <version>1</version>
+  <properties>
+    <analysis-model.version>14.20.0</analysis-model.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>edu.hm.hafner</groupId>
+      <artifactId>analysis-model</artifactId>
+      <version>${analysis-model.version}</version>
+    </dependency>
+  </dependencies>
+</project>

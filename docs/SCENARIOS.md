@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 101 scenarios live under `scenarios/<name>/` and each one ships a
+The 102 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -195,7 +195,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 101
+`grouping-identity` is the 0.11 contract gate. The lab now ships 102
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -374,7 +374,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 101. Each validated version is recorded in
+The release gate runs all 102. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -439,7 +439,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 101 (sequential, long-running-drift is the long pole)
+# All 102 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1349,11 +1349,12 @@ visible in Grafana :
 
 ## CI/CD integration scenarios
 
-5 scenarios that validate the perf-sentinel integration in CI/CD
+6 scenarios that validate the perf-sentinel integration in CI/CD
 pipelines: the canonical ack workflow (regression to ack via PR to
 green pipeline), the 3 upstream templates (GitLab CI, Jenkinsfile,
-GitHub Actions), and the output formats / diff / cap loader coverage.
-`ci-shift-left` and `output-formats-coverage` take their CLI image from
+GitHub Actions), the output formats / diff / cap loader coverage, and
+the SARIF read by the Warnings NG parser.
+`ci-shift-left`, `output-formats-coverage` and `sarif-warnings-ng` take their CLI image from
 `scripts/resolve-image.sh`, so they track the version under validation:
 `PERF_SENTINEL_IMAGE` (a full reference, for a locally built pre-release),
 then `PERF_SENTINEL_VERSION` (a GHCR tag), then the pin in
@@ -1364,7 +1365,7 @@ once the release is published. `template-gitlab-ci` derives that tag
 from its own fixture pin and fails the parity step when the two
 disagree, because its seeded pipeline downloads and runs that release
 binary. The other two run no perf-sentinel binary and stay on
-`UPSTREAM_VERSION`, default 0.35.0. All three fall back to the local
+`UPSTREAM_VERSION`, default 0.36.0. All three fall back to the local
 clone at `PERF_SENTINEL_REPO_PATH` while the tag does not exist yet, which
 is how a pre-release pass validates the templates it is about to ship.
 
@@ -1378,10 +1379,12 @@ Canonical 3-phase use case:
 2. **Regression**: `make validate-findings` (the 10 fault scripts)
    drives anti-patterns, daemon exports, `analyze --ci` fails the
    gate, JSON + SARIF emitted, signature field asserted on every
-   finding (0.5.17 feature). The SARIF is held to the 0.35.0 shape in
-   stdlib python (no result-level `logicalLocations`, no `fixes`, one
-   location with two `logicalLocations`, a string `suggestedFix`, no
-   `startLine` below 1), then to the full SARIF 2.1.0 schema when
+   finding (0.5.17 feature). The SARIF is held to the 0.36.0 shape in
+   stdlib python (no result-level `logicalLocations`, no `fixes`,
+   `properties.service` and `properties.endpoint` set, at most one
+   location, which carries a `physicalLocation` and two
+   `logicalLocations`, a string `suggestedFix`, no `startLine` below 1),
+   then to the full SARIF 2.1.0 schema when
    `check-jsonschema` and the engine's vendored
    `tests/fixtures/sarif-schema-2.1.0.json` are both available.
 3. **Acked**: signatures from phase 2 written into
@@ -1418,6 +1421,29 @@ Report at `/tmp/scenario-ci-shift-left-report.md`. The artefacts under
 make verify-output-formats-coverage  # depends on ci-shift-left having run
 ```
 
+### sarif-warnings-ng
+
+Schema validity is not enough for Jenkins. In 0.35.0 every SARIF result
+carried a location, without `physicalLocation` when the finding had no
+source file: valid SARIF 2.1.0, but violations-lib, behind the Warnings
+NG `sarif` tool, throws a `NullPointerException` on it and drops the
+whole file. This scenario runs `analyze --format sarif` on the demo
+fixture (7 results with a source file, 4 structural ones without) and
+hands the file to analysis-model 14.20.0's `SarifAdapter` (violations-lib
+3.0.2) in a Maven container:
+
+- **W1** the fixture yields results both with and without a source file
+- **W2** the parser reads the file without exception, one issue per result
+- **W3** every result with a source file keeps its file and line
+
+FAIL on 0.35.0 (W2 shows the NPE), PASS from 0.36.0. Docker only, no
+cluster.
+
+```bash
+make verify-sarif-warnings-ng
+ANALYSIS_MODEL_VERSION=14.21.0 make verify-sarif-warnings-ng
+```
+
 ### template-gitlab-ci
 
 Validates the upstream `docs/ci-templates/gitlab-ci.yml` at the tag the
@@ -1445,7 +1471,7 @@ SKIP_E2E=1 make verify-template-gitlab-ci  # lint + parity only
 Note: upstream filename is `jenkinsfile.groovy` (lowercase, .groovy
 extension), NOT `Jenkinsfile`. Multibranch Pipeline accepts both.
 
-1. Curl upstream `jenkinsfile.groovy` at v0.35.0 (`UPSTREAM_VERSION`).
+1. Curl upstream `jenkinsfile.groovy` at v0.36.0 (`UPSTREAM_VERSION`).
 2. Structural lint (declarative pipeline skeleton, `analyze`, `--ci`,
    SARIF, version pin equal to `UPSTREAM_VERSION`) and the 0.35.0 shape:
    install as the first stage, asset by `uname -m`, reused workspace
@@ -1461,7 +1487,7 @@ SKIP_RUNTIME=1 make verify-template-jenkinsfile
 
 ### template-github-actions
 
-1. Curl upstream `github-actions.yml` at v0.35.0 (`UPSTREAM_VERSION`).
+1. Curl upstream `github-actions.yml` at v0.36.0 (`UPSTREAM_VERSION`).
 2. Structural lint (YAML parse, top-level keys, install + analyze +
    `--ci` + SARIF upload, action SHAs pinned to 40-char commits, the
    template's own pin equal to `UPSTREAM_VERSION`).
@@ -1478,11 +1504,12 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | --- | --- | --- | --- |
 | ci-shift-left | clean / regression / acked workflow | yes (primary) | yes |
 | output-formats-coverage | json/sarif/text/html, diff, cap loader | yes (primary) | yes |
+| sarif-warnings-ng | SARIF read by the Warnings NG parser | yes | yes |
 | template-gitlab-ci | gitlab-ci.yml lint + E2E | yes | LOCAL ONLY (GitLab CE RAM) |
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 101 scenarios, in an order
+`make verify-all-scenarios` includes all 102 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is

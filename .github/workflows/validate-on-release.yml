@@ -208,6 +208,9 @@ jobs:
       - name: B1 verify-output-formats-coverage (depends on ci-shift-left)
         run: make verify-output-formats-coverage
 
+      - name: B1 verify-sarif-warnings-ng (SARIF through the Warnings NG parser)
+        run: make verify-sarif-warnings-ng
+
       - name: B1 verify-disclose (two-tier waste, CLI-only)
         # disclose is offline (no daemon/cluster contact). Runs against the
         # release binary (inherits the job PERF_SENTINEL_VERSION) so it follows
@@ -281,6 +284,7 @@ jobs:
             /tmp/perf-sentinel-simulation-lab-*.md
             /tmp/scenario-ci-shift-left-report.md
             /tmp/scenario-output-formats-coverage-report.md
+            /tmp/scenario-sarif-warnings-ng-report.md
             /tmp/ci-shift-left/
             /tmp/output-formats-coverage/
           retention-days: 14

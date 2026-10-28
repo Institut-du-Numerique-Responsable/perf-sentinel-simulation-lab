@@ -20,7 +20,7 @@ PERF_SENTINEL_LOCAL_BIN ?= $(PERF_SENTINEL_REPO_PATH)/target/release/perf-sentin
 		verify-daemon-otlp-direct \
         verify-multiformat-input verify-calibrate-mode verify-sidecar-pattern \
         verify-correlation-finding verify-grouping-identity verify-pg-stat verify-grafana-dashboard \
-        verify-ci-shift-left verify-output-formats-coverage verify-disclose verify-disclose-temporal \
+        verify-ci-shift-left verify-output-formats-coverage verify-sarif-warnings-ng verify-disclose verify-disclose-temporal \
         verify-verify-hash-roundtrip verify-intent-validator verify-daemon-analysis-shedding \
         verify-template-gitlab-ci verify-template-jenkinsfile verify-template-github-actions \
         verify-multi-agent-load verify-long-running-drift \
@@ -209,6 +209,7 @@ validate: ## Validate manifests, helm values, dashboards, scripts (no cluster)
 	@bash -n scenarios/measured-energy-chain/verify.sh
 	@bash -n scenarios/ci-shift-left/verify.sh
 	@bash -n scenarios/output-formats-coverage/verify.sh
+	@bash -n scenarios/sarif-warnings-ng/verify.sh
 	@bash -n scenarios/verify-hash-roundtrip/verify.sh
 	@bash -n scenarios/sql-backtick-redaction/verify.sh
 	@bash -n scenarios/non-sql-datastore-drop/verify.sh
@@ -517,6 +518,9 @@ verify-ci-shift-left: ## CI shift-left workflow (clean / regression / acked) pos
 
 verify-output-formats-coverage: ## Output formats, diff mode, signature presence, ack cap loader
 	./scenarios/output-formats-coverage/verify.sh
+
+verify-sarif-warnings-ng: ## 0.36.0 SARIF read by the Jenkins Warnings NG parser (analysis-model SarifAdapter), Docker only
+	./scenarios/sarif-warnings-ng/verify.sh
 
 verify-verify-hash-roundtrip: ## verify-hash CLI contract (exit codes 1/3/4 + identity-required default)
 	./scenarios/verify-hash-roundtrip/verify.sh
@@ -835,7 +839,7 @@ verify-all-scenarios: seed-tracegen ## Run all 101 scenarios sequentially (see d
 	@# - hub-access-control runs right after the other hub-* gates: it stands up
 	@#   its own daemon and Hub in an isolated namespace and touches neither the
 	@#   shared daemon nor the shared Hub.
-	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste database-host-groups sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror hub-incidents-push hub-correlations-push hub-disclosures cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
+	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste database-host-groups sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage sarif-warnings-ng verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror hub-incidents-push hub-correlations-push hub-disclosures cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
 	  echo "==> verify-$$s"; \
 	  $(MAKE) verify-$$s || echo "$$s FAILED"; \
 	done
