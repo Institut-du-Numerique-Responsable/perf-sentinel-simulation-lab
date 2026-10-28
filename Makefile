@@ -60,7 +60,7 @@ PERF_SENTINEL_LOCAL_BIN ?= $(PERF_SENTINEL_REPO_PATH)/target/release/perf-sentin
         verify-disclose-archive-family-baseline verify-diff-mutated-findings \
         seed-hub-local verify-hub-ingestion verify-hub-incidents-mirror verify-hub-incidents-push verify-hub-correlations-push verify-hub-disclosures \
         verify-hub-source-reachability \
-        verify-hub-derived-status verify-hub-lineage-mutation \
+        verify-hub-derived-status verify-hub-lineage-mutation verify-hub-detection-volume \
         verify-hub-retention-purge verify-hub-plugin-contract \
         verify-hub-access-control \
         verify-otlp-compression-matrix verify-ack-lifecycle-warning \
@@ -167,6 +167,7 @@ validate: ## Validate manifests, helm values, dashboards, scripts (no cluster)
 	@bash -n scenarios/hub-disclosures/verify.sh
 	@bash -n scenarios/hub-source-reachability/verify.sh
 	@bash -n scenarios/hub-derived-status/verify.sh
+	@bash -n scenarios/hub-detection-volume/verify.sh
 	@bash -n scenarios/hub-lineage-mutation/verify.sh
 	@bash -n scenarios/hub-retention-purge/verify.sh
 	@bash -n scenarios/hub-plugin-contract/verify.sh
@@ -662,6 +663,9 @@ verify-hub-source-reachability: ## push vs poll on unreachable_since, on an isol
 verify-hub-derived-status: ## active -> likely_resolved -> not_observed, with the two negative cases that must stay not_observed
 	./scenarios/hub-derived-status/verify.sh
 
+verify-hub-detection-volume: ## Hub 0.8.6 detection volume: the same total by poll and push, two ledgers over a restart, multi_instance behind one address (local Hub + two 0.37.0 daemons, no cluster)
+	./scenarios/hub-detection-volume/verify.sh
+
 verify-hub-lineage-mutation: ## a real SQL template mutation keeps its origin: Hub lineage plus the CLI diff pairing
 	./scenarios/hub-lineage-mutation/verify.sh
 
@@ -787,7 +791,7 @@ verify-export-snapshot-scope: ## 0.13.1 export snapshot scope: the configurable 
 verify-otlp-compression-matrix: ## 0.9.28 OTLP transport x encoding matrix (gRPC/HTTP x gzip/deflate/none/zstd) with an A/B against the pre-fix image (Docker, no cluster; one cluster leg SKIPs without one)
 	./scenarios/otlp-compression-matrix/verify.sh
 
-verify-all-scenarios: seed-tracegen ## Run all 103 scenarios sequentially (see docs/SCENARIOS.md)
+verify-all-scenarios: seed-tracegen ## Run all 104 scenarios sequentially (see docs/SCENARIOS.md)
 	@# Order matters:
 	@# - grafana-dashboard before pg-stat so pg-stat detects postgres-exporter
 	@#   and exercises Path 2 (--pg-stat-prometheus).
@@ -844,7 +848,7 @@ verify-all-scenarios: seed-tracegen ## Run all 103 scenarios sequentially (see d
 	@# - hub-access-control runs right after the other hub-* gates: it stands up
 	@#   its own daemon and Hub in an isolated namespace and touches neither the
 	@#   shared daemon nor the shared Hub.
-	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch detection-volume diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste database-host-groups sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage sarif-warnings-ng verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror hub-incidents-push hub-correlations-push hub-disclosures cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
+	@for s in limit-batch-volume endpoint-resolution java-ci-capture java-ci-file-export micrometer-http-client hibernate-alias-suggestion ack-store-fsgroup-root outbound-proxy-private-ca ci-e2e-jenkins ci-e2e-github ci-e2e-gitlab archive-integrity-chain archive-window-drops config-fragments incident-window-capture incident-namespace-scope incident-alerting-chain grouping-identity grouping-metrics-split findings-page-filters correlation-event-time slow-window-cross-batch detection-volume diff-mutated-findings ack-lifecycle-warning export-snapshot-scope broker-messaging-waste database-host-groups sql-backtick-redaction non-sql-datastore-drop non-sql-datastore-metering ruby-activerecord-suggestion datadog-bridge batch-otlp-file otlp-compression-matrix mysql-stat astronomy-shop sampling-degradation semconv-drift prod-topology-replay rpc-carrier-parity chaos-replay alumet-conformance alumet-db-waste appsec-hardening hybrid-daemon-batch batch-tempo-scrape batch-victoria-scrape daemon-otlp-direct hub-ingestion hub-derived-status hub-detection-volume hub-lineage-mutation hub-retention-purge hub-plugin-contract hub-access-control multiformat-input calibrate-mode sidecar-pattern correlation-finding consumer-endpoint grafana-dashboard query-monitor-api pg-stat ci-shift-left output-formats-coverage sarif-warnings-ng verify-hash-roundtrip intent-validator disclose disclose-temporal disclose-archive-family-baseline sci-functional-unit rgesn-crosswalk esrs-e1-crosswalk verify-hash-fail-closed chart-prometheusrule-pdb chart-disclose-persistence template-gitlab-ci template-jenkinsfile template-github-actions multi-agent-load long-running-drift failure-mode-daemon-restart daemon-sigterm-drain daemon-analysis-shedding failure-mode-backend-down failure-mode-network-partition hub-source-reachability hub-incidents-mirror hub-incidents-push hub-correlations-push hub-disclosures cold-start-edge-cases daemon-ack-workflow scaphandre-mock-validation measured-energy-chain limit-trace-shapes limit-multi-source limit-service-cardinality limit-saturation-curve limit-prod-window-soak; do \
 	  echo "==> verify-$$s"; \
 	  $(MAKE) verify-$$s || echo "$$s FAILED"; \
 	done

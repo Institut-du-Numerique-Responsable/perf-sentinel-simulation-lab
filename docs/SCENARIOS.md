@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 103 scenarios live under `scenarios/<name>/` and each one ships a
+The 104 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -196,7 +196,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 103
+`grouping-identity` is the 0.11 contract gate. The lab now ships 104
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -362,6 +362,9 @@ daemon forgets it: a pair active twice around a silence longer than its gap land
 episodes, and an incident posted during the second overlaps it alone. It has its own section
 too.
 
+`hub-detection-volume` is the 0.37.0 and 0.8.6 addition, the detection volume from two loopback
+daemons to a windowed read of the Hub, without the cluster. It has its own section too.
+
 `hub-disclosures` is the 0.31.0 and 0.7.0 addition: a CI publishes a periodic disclosure, the
 Hub checks and renders it, shares it through a link `verify-hash --url` reaches over https, refuses
 edited figures and an internal report, and signs a webhook per event. It has its own section too.
@@ -375,7 +378,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 103. Each validated version is recorded in
+The release gate runs all 104. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -440,7 +443,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 103 (sequential, long-running-drift is the long pole)
+# All 104 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1510,7 +1513,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 103 scenarios, in an order
+`make verify-all-scenarios` includes all 104 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3598,6 +3601,28 @@ Grafana panel make.
 **An incident finds the episode it overlaps.** The incident freezes 20 s back, so its window
 opens long after the first episode ended. Read back from the Hub, that window must overlap the
 second episode alone, the same read an incident's detail makes in the launcher.
+
+## hub-detection-volume (0.37.0 and 0.8.6 detection volume through the Hub)
+
+`make verify-hub-detection-volume`. Self-contained: a Release build of the Hub run as a local
+`dotnet` process, two 0.37.0 daemons from the local binary, python3 with `opentelemetry-proto`,
+curl. No cluster, no Docker, about 90 seconds, most of it the daemon's detection push, at most
+once a minute.
+
+The `detection-volume` scenario proves the daemon's ledger, the Hub's tests prove the fold, and
+neither sees the other. The Hub knows three sources: `hdv-poll` polls daemon A, `hdv-push`
+receives daemon B's push and polls nothing, `hdv-pods` reaches both daemons behind a loopback
+proxy that moves to the other one on each `/api/status`, as two pods behind a Service.
+
+1. The same 8 detections read 8 by poll alone and 8 by push alone.
+2. Daemon A restarts and takes 5 more. Its own ledger counts 5, the Hub serves 13 with `restart`
+   in `detections_gaps`, and two successive ledgers do not read as `multi_instance`.
+3. `hdv-pods` carries `multi_instance`, the push-only source does not.
+4. The finding's count is the sum of its sources, and incomplete.
+5. A read without `from` or `to` carries none of the seven new names.
+6. `perf_sentinel_hub_detection_reads_total` counts the poll's passes.
+
+FAIL on Hub 0.8.5 (step 1, the windowed read carries no `detections`), PASS on 0.8.6.
 
 ## hub-disclosures (0.31.0 and 0.7.0 disclosures published to the Hub)
 
