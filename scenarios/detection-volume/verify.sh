@@ -13,6 +13,11 @@
 #   V3 /api/status detection_ledger.current_day is today (UTC epoch day).
 #   V4 after a restart, a new ledger_id, today carries gap = true, and the
 #      planted signature is gone: the ledger is not persisted.
+#   V5 the push to a fake PerfSentinelHub (POST /api/import/detections)
+#      carries the planted count and a day object.
+#   V6 detections added just before SIGTERM reach the fake Hub: only the
+#      drain's forced push can carry them, the next regular round being a
+#      minute away.
 #
 # On 0.36.0 the route does not exist (404) and V1 fails.
 set -euo pipefail
@@ -27,6 +32,8 @@ PERF_SENTINEL_LOCAL_BIN="${PERF_SENTINEL_LOCAL_BIN:-${PERF_SENTINEL_REPO_PATH}/t
 DAEMON_HTTP_PORT="${DV_DAEMON_HTTP_PORT:-14948}"
 DAEMON_GRPC_PORT="${DV_DAEMON_GRPC_PORT:-14947}"
 DAEMON_URL="http://127.0.0.1:${DAEMON_HTTP_PORT}"
+HUB_PORT="${DV_HUB_PORT:-14949}"
+SOURCE_ID="dv-lab"
 PLANTED="${DV_PLANTED:-12}"
 FILLERS="${DV_FILLERS:-6}"
 RING=5
@@ -39,8 +46,10 @@ ok()   { color_green "    ok: $*"; }
 die()  { color_red   "    error: $*"; cat "${REPORT}" 2>/dev/null || true; exit 1; }
 
 DAEMON_PID=""
+HUB_PID=""
 cleanup() {
   [ -n "${DAEMON_PID}" ] && kill "${DAEMON_PID}" 2>/dev/null
+  [ -n "${HUB_PID}" ] && kill "${HUB_PID}" 2>/dev/null
   rm -rf "${TMP_DIR}"
   return 0
 }
@@ -71,7 +80,72 @@ enabled = false
 
 [detection]
 n_plus_one_min_occurrences = 5
+
+# A fake PerfSentinelHub on loopback records every push.
+[daemon.hub_export]
+enabled = true
+endpoint = "http://127.0.0.1:${HUB_PORT}/api/import/findings"
+source_id = "${SOURCE_ID}"
+api_key_file = "${TMP_DIR}/hub.key"
+flush_interval_secs = 1
 EOF
+python3 -c 'print("k" * 32)' > "${TMP_DIR}/hub.key"
+chmod 600 "${TMP_DIR}/hub.key"
+
+# Answers 200 to every import and appends {path, body} per POST to pushes.jsonl.
+cat > "${TMP_DIR}/fake_hub.py" <<'HUBPY'
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+port, out = int(sys.argv[1]), sys.argv[2]
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        with open(out, "a") as f:
+            f.write(json.dumps({"path": self.path, "body": body.decode("utf-8", "replace")}) + "\n")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"accepted":0,"rejected":0}')
+    def log_message(self, *args):
+        pass
+HTTPServer(("127.0.0.1", port), H).serve_forever()
+HUBPY
+python3 "${TMP_DIR}/fake_hub.py" "${HUB_PORT}" "${TMP_DIR}/pushes.jsonl" &
+HUB_PID=$!
+disown "${HUB_PID}" 2>/dev/null || true  # no job-control notice when cleanup kills it
+for _ in $(seq 1 20); do
+  python3 -c "import socket,sys; socket.create_connection(('127.0.0.1', int(sys.argv[1])), 1)" "${HUB_PORT}" 2>/dev/null && break
+  sleep 0.25
+done
+
+# Summarizes the detection pushes: per ledger the max planted count, the
+# days that arrived with a day object, and those marked gap=true.
+push_summary() {
+  python3 - "${TMP_DIR}/pushes.jsonl" "${SOURCE_ID}" <<'SUMPY'
+import json, sys
+path, source = sys.argv[1], sys.argv[2]
+planted, gaps, days = {}, {}, set()
+try:
+    lines = open(path).read().splitlines()
+except FileNotFoundError:
+    lines = []
+for line in lines:
+    rec = json.loads(line)
+    if not rec["path"].startswith("/api/import/detections?source_id=" + source):
+        continue
+    page = json.loads(rec["body"])
+    led = page["ledger_id"]
+    for r in page.get("counts", []):
+        if r["signature"].startswith("n_plus_one_sql:dv-planted:"):
+            planted[led] = max(planted.get(led, 0), r["detections"])
+    for d in page.get("days", []):
+        days.add((led, d["day"]))
+        if d["gap"]:
+            gaps.setdefault(led, set()).add(d["day"])
+print(json.dumps({"planted": planted, "gaps": {k: sorted(v) for k, v in gaps.items()},
+                  "days": sorted(f"{l}:{d}" for l, d in days)}))
+SUMPY
+}
 
 start_daemon() {
   # A leftover daemon on the port would answer readiness for us.
@@ -100,7 +174,7 @@ stop_daemon() {
 today() { python3 -c 'import time; print(int(time.time() * 1000) // 86400000)'; }
 
 step "Build the OTLP payload: ${PLANTED} planted N+1 traces, ${FILLERS} filler signatures"
-python3 - "${TMP_DIR}/payload.pb" "${PLANTED}" "${FILLERS}" <<'PY'
+cat > "${TMP_DIR}/build_payload.py" <<'PY'
 import sys, time
 from opentelemetry.proto.collector.trace.v1 import trace_service_pb2 as svc
 from opentelemetry.proto.common.v1 import common_pb2 as common
@@ -108,6 +182,7 @@ from opentelemetry.proto.resource.v1 import resource_pb2 as resource
 from opentelemetry.proto.trace.v1 import trace_pb2 as trace
 
 out, planted, fillers = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+base = int(sys.argv[4]) if len(sys.argv) > 4 else 0
 now = time.time_ns()
 
 def kv(k, v):
@@ -136,11 +211,12 @@ def resource_spans(service, spans):
         resource=resource.Resource(attributes=[kv("service.name", service)]),
         scope_spans=[trace.ScopeSpans(spans=spans)])
 
-rs = [resource_spans("dv-planted", [s for t in range(planted) for s in n1_trace(0xD0000 + t, "orders")])]
+rs = [resource_spans("dv-planted", [s for t in range(planted) for s in n1_trace(0xD0000 + base + t, "orders")])]
 # Fillers after the planted traces, so the ring ends up holding them.
 rs += [resource_spans("dv-filler-%d" % f, n1_trace(0xF0000 + f, "items")) for f in range(fillers)]
 open(out, "wb").write(svc.ExportTraceServiceRequest(resource_spans=rs).SerializeToString())
 PY
+python3 "${TMP_DIR}/build_payload.py" "${TMP_DIR}/payload.pb" "${PLANTED}" "${FILLERS}"
 ok "payload: $(wc -c < "${TMP_DIR}/payload.pb" | tr -d ' ') bytes"
 
 start_daemon
@@ -239,7 +315,35 @@ CURRENT_DAY="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['
 LEDGER_1="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['detection_ledger']['ledger_id'])" "${TMP_DIR}/status1.json")"
 ok "current_day ${CURRENT_DAY}, ledger ${LEDGER_1}"
 
+step "V5 the push to the fake Hub carries the planted count"
+# The detection half pushes at most once a minute.
+V5_PLANTED=0
+for _ in $(seq 1 100); do
+  V5_PLANTED="$(push_summary | python3 -c "import json,sys; print(json.load(sys.stdin)['planted'].get(sys.argv[1], 0))" "${LEDGER_1}")"
+  [ "${V5_PLANTED}" = "${PLANTED}" ] && break
+  sleep 1
+done
+[ "${V5_PLANTED}" = "${PLANTED}" ] \
+  || die "V5 the pushes of ledger ${LEDGER_1} carry ${V5_PLANTED} planted detections, want ${PLANTED} (fake Hub log: ${TMP_DIR}/pushes.jsonl)"
+push_summary | python3 -c "import json,sys; s=json.load(sys.stdin); sys.exit(0 if any(x.startswith(sys.argv[1] + ':') for x in s['days']) else 1)" "${LEDGER_1}" \
+  || die "V5 no day object pushed for ledger ${LEDGER_1}"
+ok "push carried ${V5_PLANTED} planted detections and a day object"
+
 step "V4 a restart opens a new ledger, today is a gap, nothing carried over"
+# V6 setup: ${EXTRA} more planted detections, then SIGTERM before the next
+# regular push round (at least a minute after V5's).
+EXTRA=3
+python3 "${TMP_DIR}/build_payload.py" "${TMP_DIR}/extra.pb" "${EXTRA}" 0 1000
+CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -X POST "${DAEMON_URL}/v1/traces" \
+  -H 'Content-Type: application/x-protobuf' --data-binary @"${TMP_DIR}/extra.pb")"
+[ "${CODE}" = "200" ] || die "V6 OTLP POST answered ${CODE}"
+WANT_TOTAL=$((PLANTED + EXTRA))
+for _ in $(seq 1 40); do
+  read -r _ NOW_PLANTED _ <<< "$(read_ledger "${TMP_DIR}/page-extra.json")"
+  [ "${NOW_PLANTED}" = "${WANT_TOTAL}" ] && break
+  sleep 0.25
+done
+[ "${NOW_PLANTED}" = "${WANT_TOTAL}" ] || die "V6 the ledger shows ${NOW_PLANTED} planted detections, want ${WANT_TOTAL}"
 stop_daemon
 start_daemon
 curl -fsS "${DAEMON_URL}/api/status" > "${TMP_DIR}/status2.json" || die "V4 /api/status unreadable after restart"
@@ -260,6 +364,12 @@ read -r DAY_2 GAP_2 PLANTED_2 <<< "${V4}"
 [ "${PLANTED_2}" = "0" ] || die "V4 the new ledger counts ${PLANTED_2} planted detections, want 0 (no persistence)"
 ok "ledger ${LEDGER_1} -> ${LEDGER_2}, day ${DAY_2} gap=true, planted count 0"
 
+step "V6 the drain pushed the detections added just before SIGTERM"
+V6_PLANTED="$(push_summary | python3 -c "import json,sys; print(json.load(sys.stdin)['planted'].get(sys.argv[1], 0))" "${LEDGER_1}")"
+[ "${V6_PLANTED}" = "${WANT_TOTAL}" ] \
+  || die "V6 the fake Hub holds ${V6_PLANTED} planted detections for ledger ${LEDGER_1}, want ${WANT_TOTAL}: the drain did not push"
+ok "drain push carried ${V6_PLANTED} planted detections"
+
 {
   echo "# Scenario: ${SCENARIO}"
   echo ""
@@ -271,6 +381,8 @@ ok "ledger ${LEDGER_1} -> ${LEDGER_2}, day ${DAY_2} gap=true, planted count 0"
   echo "| V2 | limit=1 walk | ${PAGES} pages, same rows, total ${PAGED_PLANTED} |"
   echo "| V3 | /api/status detection_ledger.current_day | ${CURRENT_DAY} (today) |"
   echo "| V4 | restart | new ledger_id, today gap=true, planted count 0 |"
+  echo "| V5 | push to a fake Hub | ${V5_PLANTED}/${PLANTED} planted detections and a day object |"
+  echo "| V6 | drain push at SIGTERM | ${V6_PLANTED}/${WANT_TOTAL} planted detections reached the fake Hub |"
   echo ""
   echo "Verdict: **PASS**"
 } > "${REPORT}"

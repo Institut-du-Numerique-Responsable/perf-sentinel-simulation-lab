@@ -192,7 +192,7 @@ Findings produced by the standard rule omit the field.
 | [`findings-page-filters`](#findings-page-filters-0210-findings-page-contract-and-its-fold) | 0.21.0 findings page filters, paging and fold, against the published releases | local binary + Docker | PASS   |
 | [`correlation-event-time`](#correlation-event-time-0230-pairing-on-event-time) | 0.23.0 correlator pairing on event time, both sides' traces, against the published release | local binary + Docker | PASS   |
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
-| [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart | local binary | PASS   |
+| [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart, the push and its drain | local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
@@ -1366,7 +1366,7 @@ once the release is published. `template-gitlab-ci` derives that tag
 from its own fixture pin and fails the parity step when the two
 disagree, because its seeded pipeline downloads and runs that release
 binary. The other two run no perf-sentinel binary and stay on
-`UPSTREAM_VERSION`, default 0.36.0. All three fall back to the local
+`UPSTREAM_VERSION`, default 0.37.0. All three fall back to the local
 clone at `PERF_SENTINEL_REPO_PATH` while the tag does not exist yet, which
 is how a pre-release pass validates the templates it is about to ship.
 
@@ -1472,7 +1472,7 @@ SKIP_E2E=1 make verify-template-gitlab-ci  # lint + parity only
 Note: upstream filename is `jenkinsfile.groovy` (lowercase, .groovy
 extension), NOT `Jenkinsfile`. Multibranch Pipeline accepts both.
 
-1. Curl upstream `jenkinsfile.groovy` at v0.36.0 (`UPSTREAM_VERSION`).
+1. Curl upstream `jenkinsfile.groovy` at v0.37.0 (`UPSTREAM_VERSION`).
 2. Structural lint (declarative pipeline skeleton, `analyze`, `--ci`,
    SARIF, version pin equal to `UPSTREAM_VERSION`) and the 0.35.0 shape:
    install as the first stage, asset by `uname -m`, reused workspace
@@ -1488,7 +1488,7 @@ SKIP_RUNTIME=1 make verify-template-jenkinsfile
 
 ### template-github-actions
 
-1. Curl upstream `github-actions.yml` at v0.36.0 (`UPSTREAM_VERSION`).
+1. Curl upstream `github-actions.yml` at v0.37.0 (`UPSTREAM_VERSION`).
 2. Structural lint (YAML parse, top-level keys, install + analyze +
    `--ci` + SARIF upload, action SHAs pinned to 40-char commits, the
    template's own pin equal to `UPSTREAM_VERSION`).
@@ -3218,7 +3218,7 @@ published image.
 
 `make verify-detection-volume`. Self-contained: the local release binary,
 python3 with `opentelemetry-proto`, and curl. No cluster, no Docker, about
-15 seconds.
+a minute and a half (the detection push runs at most once a minute).
 
 The `seen_count` of `/api/findings` counts what the daemon's ring still
 retains, never a volume. 0.37.0 adds a per-day detection ledger, served on
@@ -3234,6 +3234,12 @@ traces with an N+1 each on its own service, 7 signatures for a ring of 5.
 3. `/api/status` `detection_ledger.current_day` is today, the UTC epoch day.
 4. After a SIGTERM and a new start: a new `ledger_id`, today carries
    `gap = true`, and the planted signature is gone (no persistence).
+5. The push to a fake PerfSentinelHub on loopback
+   (`POST /api/import/detections`) carries the 12 planted detections and a
+   day object.
+6. Three more planted detections posted just before the SIGTERM reach the
+   fake Hub: only the drain's forced push can carry them, the next regular
+   round being a minute away.
 
 FAIL on 0.36.0 (step 1, the route answers 404), PASS from 0.37.0.
 

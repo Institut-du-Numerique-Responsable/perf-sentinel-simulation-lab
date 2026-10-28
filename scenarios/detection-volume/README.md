@@ -25,6 +25,8 @@ OTLP/protobuf POST: 12 traces with the same N+1 (service `dv-planted`), then
 | V2 | a walk with `limit=1` and the `next_after` cursor returns the same rows, so the same total |
 | V3 | `/api/status` `detection_ledger.current_day` is today, the UTC epoch day |
 | V4 | after a SIGTERM and a new start: a new `ledger_id`, today carries `gap = true`, and the planted signature is gone |
+| V5 | the push to a fake PerfSentinelHub on loopback (`POST /api/import/detections?source_id=dv-lab`) carries the 12 planted detections and a day object |
+| V6 | 3 more planted detections posted just before the SIGTERM reach the fake Hub: only the drain's forced push can carry them, the next regular round being a minute away |
 
 The payload is built at run time with `opentelemetry-proto`, span timestamps
 at the current time.
