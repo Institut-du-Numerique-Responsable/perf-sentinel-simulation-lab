@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 102 scenarios live under `scenarios/<name>/` and each one ships a
+The 103 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -192,10 +192,11 @@ Findings produced by the standard rule omit the field.
 | [`findings-page-filters`](#findings-page-filters-0210-findings-page-contract-and-its-fold) | 0.21.0 findings page filters, paging and fold, against the published releases | local binary + Docker | PASS   |
 | [`correlation-event-time`](#correlation-event-time-0230-pairing-on-event-time) | 0.23.0 correlator pairing on event time, both sides' traces, against the published release | local binary + Docker | PASS   |
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
+| [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart | local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 102
+`grouping-identity` is the 0.11 contract gate. The lab now ships 103
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -374,7 +375,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 102. Each validated version is recorded in
+The release gate runs all 103. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -439,7 +440,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 102 (sequential, long-running-drift is the long pole)
+# All 103 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1509,7 +1510,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 102 scenarios, in an order
+`make verify-all-scenarios` includes all 103 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3212,6 +3213,29 @@ published image.
 4. The disabled window reports nothing.
 5. Counter-proof: the published image reports nothing.
 6. `slow_query_window_minutes = 61` is refused at config load.
+
+## detection-volume (0.37.0, detections counted past the findings ring)
+
+`make verify-detection-volume`. Self-contained: the local release binary,
+python3 with `opentelemetry-proto`, and curl. No cluster, no Docker, about
+15 seconds.
+
+The `seen_count` of `/api/findings` counts what the daemon's ring still
+retains, never a volume. 0.37.0 adds a per-day detection ledger, served on
+`GET /api/detections`, that counts every detection by signature before the
+ring sees it. A throwaway loopback daemon keeps `max_retained_findings = 5`
+and receives one OTLP/protobuf POST: 12 traces with the same N+1, then 6
+traces with an N+1 each on its own service, 7 signatures for a ring of 5.
+
+1. `/api/detections` counts the planted signature 12 times, on one row,
+   while the ring retains fewer than 12 of its detections.
+2. A walk with `limit=1` and the `next_after` cursor returns the same rows,
+   so the same total.
+3. `/api/status` `detection_ledger.current_day` is today, the UTC epoch day.
+4. After a SIGTERM and a new start: a new `ledger_id`, today carries
+   `gap = true`, and the planted signature is gone (no persistence).
+
+FAIL on 0.36.0 (step 1, the route answers 404), PASS from 0.37.0.
 
 ## incident-alerting-chain (0.22.0, where the delivery comes from)
 
