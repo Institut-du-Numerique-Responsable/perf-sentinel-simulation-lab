@@ -266,10 +266,19 @@ for shape in a b; do
   done
 done
 # The daemon closes its correlation window and stores asynchronously.
-for _ in $(seq 1 30); do
+# The agent sanitizes the literals (distinct_params is 1), so N+1 versus
+# redundant_sql rests on the daemon's sanitizer-aware heuristic, which can read
+# one request of a shape as redundant_sql. A shape still missing is sent again.
+for i in $(seq 1 30); do
   daemon_finding "order_id = ?" "quantity" > "${TMP_DIR}/shape-a.json" || true
   daemon_finding "quantity" "" > "${TMP_DIR}/shape-b.json" || true
   [ -s "${TMP_DIR}/shape-a.json" ] && [ -s "${TMP_DIR}/shape-b.json" ] && break
+  if [ $((i % 5)) -eq 0 ]; then
+    for shape in a b; do
+      [ -s "${TMP_DIR}/shape-${shape}.json" ] || curl -sf -o /dev/null -X POST \
+        "http://127.0.0.1:${ORDER_PORT}${ENDPOINT}?shape=${shape}&items=${ITEMS}" || true
+    done
+  fi
   sleep 2
 done
 SIG_A="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["signature"])' "${TMP_DIR}/shape-a.json" 2>/dev/null || echo "")"
