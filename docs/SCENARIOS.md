@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 105 scenarios live under `scenarios/<name>/` and each one ships a
+The 106 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -194,10 +194,11 @@ Findings produced by the standard rule omit the field.
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
 | [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart, the push and its drain | local binary | PASS   |
 | [`detection-carbon`](#detection-carbon-0380-the-days-avoidable-carbon-in-the-ledger) | 0.38.0 detection ledger carbon: the day's avoidable gCO2 and I/O sums on the API and the push, a carbon-only resend, absent with green off | local binary | PASS   |
+| [`hub-recap`](#hub-recap-090-review-recap-reports-and-deliveries) | Hub 0.9.0 recap: the 0.38.0 day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader | local Hub + local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 105
+`grouping-identity` is the 0.11 contract gate. The lab now ships 106
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -366,6 +367,9 @@ too.
 `hub-detection-volume` is the 0.37.0 and 0.8.6 addition, the detection volume from two loopback
 daemons to a windowed read of the Hub, without the cluster. It has its own section too.
 
+`hub-recap` is the 0.38.0 and 0.9.0 addition, the review recap from a carbon-scoring daemon to
+the frozen reports a subscription signs and mails, without the cluster. It has its own section too.
+
 `hub-disclosures` is the 0.31.0 and 0.7.0 addition: a CI publishes a periodic disclosure, the
 Hub checks and renders it, shares it through a link `verify-hash --url` reaches over https, refuses
 edited figures and an internal report, and signs a webhook per event. It has its own section too.
@@ -379,7 +383,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 105. Each validated version is recorded in
+The release gate runs all 106. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -444,7 +448,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 105 (sequential, long-running-drift is the long pole)
+# All 106 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1514,7 +1518,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 105 scenarios, in an order
+`make verify-all-scenarios` includes all 106 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3655,6 +3659,32 @@ proxy that moves to the other one on each `/api/status`, as two pods behind a Se
 6. `perf_sentinel_hub_detection_reads_total` counts the poll's passes.
 
 FAIL on Hub 0.8.5 (step 1, the windowed read carries no `detections`), PASS on 0.8.6.
+
+## hub-recap (0.9.0 review recap, reports and deliveries)
+
+`make verify-hub-recap`. Self-contained: a Release build of the Hub run as a local `dotnet`
+process, one 0.38.0 daemon from the local binary with green scoring on, python3 with
+`opentelemetry-proto`, curl. The webhook receiver and the SMTP sink are stdlib Python. No
+cluster, no Docker, under a minute. It SKIPs with exit 0 when the daemon binary, the Hub build,
+`dotnet` or `opentelemetry-proto` is absent.
+
+`detection-carbon` proves the daemon's day carbon, the Hub's tests prove the recap with a fake
+daemon and a fake relay, and neither sees the other. One source, fed by the daemon's push alone,
+receives two N+1 of one service. The Hub restarts twice on one database: trusting
+`X-Forwarded-User`, then with a daily subscription, then with access control and two local
+accounts. A subscription only freezes a closed period, so the scenario imports, with the source's
+key, the sealed ledger day a previous daemon instance would have pushed for yesterday.
+
+1. Today's recap prices the planted N+1 at the daemon's own grams per avoidable I/O.
+2. An action without an identity is a 403, with one a 201 the recap carries with its owner.
+3. Endpoint and service labels title the management rows, which hold no technical key.
+4. An on-demand report of yesterday is listed and both pages answer 200, self-contained, with a CSP.
+5. The management page names the owner without an e-mail and reads "An unnamed step in".
+6. The subscription's webhook verifies as HMAC-SHA256 of `<timestamp>.<body>`, management view only.
+7. Its e-mail attaches the management page, with no `@` outside the stylesheet.
+8. Under access control a report one member generated is the unknown-id 404 to another reader.
+
+PASS on 0.9.0 with the 0.38.0 daemon. A Hub before 0.9.0 answers `GET /api/recap` with a 404.
 
 ## hub-disclosures (0.31.0 and 0.7.0 disclosures published to the Hub)
 
