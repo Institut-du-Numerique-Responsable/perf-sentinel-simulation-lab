@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 104 scenarios live under `scenarios/<name>/` and each one ships a
+The 105 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -193,10 +193,11 @@ Findings produced by the standard rule omit the field.
 | [`correlation-event-time`](#correlation-event-time-0230-pairing-on-event-time) | 0.23.0 correlator pairing on event time, both sides' traces, against the published release | local binary + Docker | PASS   |
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
 | [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart, the push and its drain | local binary | PASS   |
+| [`detection-carbon`](#detection-carbon-0380-the-days-avoidable-carbon-in-the-ledger) | 0.38.0 detection ledger carbon: the day's avoidable gCO2 and I/O sums on the API and the push, a carbon-only resend, absent with green off | local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 104
+`grouping-identity` is the 0.11 contract gate. The lab now ships 105
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -378,7 +379,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 104. Each validated version is recorded in
+The release gate runs all 105. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -443,7 +444,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 104 (sequential, long-running-drift is the long pole)
+# All 105 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1513,7 +1514,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 104 scenarios, in an order
+`make verify-all-scenarios` includes all 105 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3245,6 +3246,36 @@ traces with an N+1 each on its own service, 7 signatures for a ring of 5.
    round being a minute away.
 
 FAIL on 0.36.0 (step 1, the route answers 404), PASS from 0.37.0.
+
+## detection-carbon (0.38.0, the day's avoidable carbon in the ledger)
+
+`make verify-detection-carbon`. Self-contained: the local release binary,
+python3 with `opentelemetry-proto`, and curl. No cluster, no Docker, about
+two minutes and a half (the detection push runs at most once a minute).
+
+0.38.0 adds four keys to each `days` object of `GET /api/detections` and of
+the push to PerfSentinelHub: `avoidable_gco2`, `avoidable_gco2_low`,
+`avoidable_io_ops` and `total_io_ops`, the day's sums over its analyzed
+batches. The Hub divides the first by the third to turn a finding's I/O into
+grams. A throwaway loopback daemon runs with green scoring on
+(`default_region = "eu-west-3"`) and pushes to a fake PerfSentinelHub.
+
+1. After 3 traces with an N+1, today carries the four keys, with
+   `avoidable_gco2 > 0`, `avoidable_io_ops > 0`, `total_io_ops >=
+   avoidable_io_ops` and `0 <= avoidable_gco2_low <= avoidable_gco2`.
+2. `avoidable_gco2 / avoidable_io_ops` is finite and positive.
+3. A batch of clean traces raises `total_io_ops` and leaves the three
+   avoidable sums as they were.
+4. The push carries the four keys on today's day object, with the API's
+   values.
+5. A second clean batch, a carbon-only change, makes the acknowledged day
+   dirty: the next regular round, a minute later, resends it with the larger
+   `total_io_ops` and no count row. No SIGTERM here, the drain's gap would
+   dirty the day on its own.
+6. A second run with no `[green]` section has none of the four keys, in the
+   API and in the drain push.
+
+FAIL on 0.37.1 (step 1, the keys do not exist), PASS from 0.38.0.
 
 ## incident-alerting-chain (0.22.0, where the delivery comes from)
 
