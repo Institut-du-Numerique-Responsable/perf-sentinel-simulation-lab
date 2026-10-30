@@ -194,6 +194,8 @@ Findings produced by the standard rule omit the field.
 | [`slow-window-cross-batch`](#slow-window-cross-batch-0230-daemon-slow-window) | 0.23.0 daemon slow window across analysis batches, against the published release | local binary + Docker | PASS   |
 | [`detection-volume`](#detection-volume-0370-detections-counted-past-the-findings-ring) | 0.37.0 detection ledger: exact count past a small findings ring, cursor paging, a new ledger on restart, the push and its drain | local binary | PASS   |
 | [`detection-carbon`](#detection-carbon-0380-the-days-avoidable-carbon-in-the-ledger) | 0.38.0 detection ledger carbon: the day's avoidable gCO2 and I/O sums on the API and the push, a carbon-only resend, absent with green off | local binary | PASS   |
+| [`card-signal`](#card-signal-0390-runs-under-a-watched-threshold) | 0.39.0 card signal: a Hub `watch` list makes the daemon count runs at or under a slow threshold (`below_threshold_passes`, `detections: 0`), `thresholds` on each day, nothing without `watch`, the list lost on restart | local binary | PASS   |
+| [`card-cli`](#card-cli-0390-share-card-commands) | 0.39.0 share cards: keygen, render of 3 angles in png/pdf/svg/jxl, verify-card offline, a retouched PNG, C3 refusals, `--online` through a fake DoH and well-known origin | local binary | PASS   |
 | [`hub-recap`](#hub-recap-090-review-recap-reports-and-deliveries) | Hub 0.9.0 recap: the 0.38.0 day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader | local Hub + local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
@@ -3280,6 +3282,65 @@ grams. A throwaway loopback daemon runs with green scoring on
    API and in the drain push.
 
 FAIL on 0.37.1 (step 1, the keys do not exist), PASS from 0.38.0.
+
+## card-signal (0.39.0, runs under a watched threshold)
+
+`make verify-card-signal`. Self-contained: the local release binary, python3
+with `opentelemetry-proto`, and curl. No cluster, no Docker, about a minute
+and a half (the detection push runs at most once a minute).
+
+0.39.0 reads a `watch` list from the reply to the detection push. For each
+watched threshold-type signature the daemon counts per day the runs at or
+under the threshold as `below_threshold_passes`, on a row of its own even
+with `detections: 0`, and each `days` object gains `thresholds`. A throwaway
+loopback daemon (`slow_query_threshold_ms = 250`, the other four thresholds
+off their defaults) pushes to a fake PerfSentinelHub whose detection route
+answers the status and list a mode file sets.
+
+1. With no `watch`, 3 SELECTs at 400 ms give the `slow_sql` signature to watch.
+2. With no `watch`, 8 runs of that template at 100 and 250 ms count nothing,
+   in the API and in the drain push.
+3. A new run with `watch: [that signature]`: the same 8 runs give
+   `detections: 0`, `below_threshold_passes: 8`, the run at exactly 250 ms
+   included.
+4. Today's `thresholds` carries the five configured knobs, the slow one under
+   both slow keys.
+5. The regular push carries that row and those thresholds.
+6. After a restart, the Hub answering 503: 8 runs count nothing, the list did
+   not survive the process.
+7. The Hub accepts again with `watch`: the next 8 runs count 8.
+
+FAIL on 0.38.0 (step 3, `watch` is ignored), PASS from 0.39.0.
+
+## card-cli (0.39.0, share card commands)
+
+`make verify-card-cli`. Self-contained: the local release binary, python3,
+openssl and cmp, the engine's `tests/fixtures/card/` inputs. No cluster, no
+Docker, a few seconds.
+
+0.39.0 adds `card keygen`, `card render` and `verify-card`, each printing one
+JSON line with closed reasons and exit codes (the engine's
+`docs/SHARE-CARD.md`).
+
+1. `card keygen`: a `ps1:` fingerprint of 22 base64url characters, the
+   SHA-256 of the public key, in a `<fingerprint>.pk8` of mode 0600.
+2. `card render` of the story, curve and collective fixtures in png, pdf, svg
+   and jxl, the same bytes on a second render.
+3. `verify-card` offline on the 12 originals: intact, level 1, `no_key_list`,
+   the input's figures. With `--keys` naming the key: level 2.
+4. One `IDAT` byte flipped, CRC fixed: the documented `content_modified`
+   line, exit 1.
+5. A period that is not a calendar month: `period_not_calendar`, exit 1; a
+   float: `malformed_input`, exit 3; nothing written.
+6. `--online --doh`: a throwaway CA, a python TLS origin answering the DoH
+   JSON query and `/.well-known/perf-sentinel-key` for `card-lab.test`, and a
+   python CONNECT proxy reached through `HTTPS_PROXY` (loopback names fail
+   the card's domain rule). Level 2 with the TXT record alone or both
+   sources, `key_revoked` (exit 1) for a `revoked=` record,
+   `binding_check_failed` and `binding_partial` (exit 4) when DoH answers
+   500, and no request for a retouched file.
+
+FAIL on 0.38.0 (step 1, no `card` subcommand), PASS from 0.39.0.
 
 ## incident-alerting-chain (0.22.0, where the delivery comes from)
 
