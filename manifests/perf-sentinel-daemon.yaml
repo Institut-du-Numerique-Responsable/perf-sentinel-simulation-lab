@@ -94,18 +94,20 @@ data:
     # strict, the low timing variance keeps the classification
     # correct. See docs/TROUBLESHOOTING.md.
     sanitizer_aware_classification = "strict"
-    # Left at the engine default on purpose, and the reason is worth stating.
-    # Raising it to 1.0 settles issue 124, where a loaded PHP-FPM runner spreads
-    # ten cached repeats past 0.5 and gets them reported as n_plus_one_sql. But
-    # this daemon is shared by every stack, and the Java N+1 that
-    # hub-lineage-mutation asserts fires at 12 occurrences, under the
-    # high-occurrence bar of 15, so under strict its only corroborator is the
-    # variance: at 1.0 its verdict oscillates between n_plus_one_sql and
-    # redundant_sql and the scenario fails, at 0.5 it is stable. The knob is
-    # per daemon, and a real deployment does not serve Java and PHP from one,
-    # so a PHP install can raise it. The lab is the mixed case, so it cannot.
-    # Validating the PHP stacks at 1.0 means a dedicated daemon or a temporary
-    # override, not this value.
+    # Left at the engine default. Raising it to 1.0 settles issue 124, where a
+    # loaded PHP-FPM runner spreads ten cached repeats past 0.5 and gets them
+    # reported as n_plus_one_sql. But this daemon is shared by every stack, and
+    # under strict a sanitized group below the high-occurrence bar of 15 has
+    # the variance as its only corroborator, so the threshold moves every such
+    # verdict. 0.5 is not a stable point for the Java stack either: 104 calls
+    # of a 12-item native-query N+1 on order-service, measured on 2026-10-30,
+    # read redundant_sql 67 times, every time the warm JVM kept the variance at
+    # or under 0.5. hub-lineage-mutation therefore sends 15 items, so the bar
+    # decides and the variance does not. The other scenarios below the bar
+    # have not been measured at 1.0, so the value stays. The knob is per
+    # daemon, and a real deployment does not serve Java and PHP from one, so a
+    # PHP install can raise it. Validating the PHP stacks at 1.0 means a
+    # dedicated daemon or a temporary override, not this value.
     sanitizer_aware_min_cv = 0.5
 
     [green.electricity_maps]

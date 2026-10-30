@@ -38,7 +38,8 @@ through the cluster OTel Collector.
 | POST   | `/api/fault/pool-saturation` | `concurrency=20`        | `pool_saturation`     |
 
 `order-service` carries one endpoint beyond this contract,
-`POST /api/fault/template-mutation-sql?shape=a|b&items=12`. It is
+`POST /api/fault/template-mutation-sql?shape=a|b&items=N` (default 12,
+the scenario sends 15). It is
 deliberately **not** part of the 12: it exists for a single scenario,
 [`hub-lineage-mutation`](../scenarios/hub-lineage-mutation), which needs the
 same detector, service and endpoint to produce two different SQL templates.

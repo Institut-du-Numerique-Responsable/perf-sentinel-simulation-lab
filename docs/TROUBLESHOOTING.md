@@ -341,10 +341,14 @@ the timing spread. The lab leaves `sanitizer_aware_min_cv` (engine
 0.18.0 and later) at its `0.5` default, and the reason is a real
 trade-off: raising it to `1.0` stops a loaded PHP-FPM runner from
 spreading ten cached repeats past the bar and getting them reported as
-`n_plus_one_sql`, but the Java N+1 that `hub-lineage-mutation` asserts
-fires at 12 occurrences, under the high-occurrence bar, so under strict
-the variance is its only corroborator and at `1.0` its verdict
-oscillates. The knob is per daemon and this one is shared by every
+`n_plus_one_sql`, but under strict a sanitized group below the
+high-occurrence bar has the variance as its only corroborator, so the
+threshold moves every such verdict on every stack. `0.5` does not hold
+a 12-item Java N+1 steady either: measured on 2026-10-30, 67 of 104
+calls of a 12-item native-query loop on `order-service` read
+`redundant_sql`, each time the warm JVM kept the variance at or under
+`0.5`. `hub-lineage-mutation` therefore sends 15 items, so the bar
+decides. The knob is per daemon and this one is shared by every
 stack. A real deployment does not serve Java and PHP from one daemon,
 so a PHP install can raise it. Production stacks that observe similar
 false positives can adopt either opt-in.
