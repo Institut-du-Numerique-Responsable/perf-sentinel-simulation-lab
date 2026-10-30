@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Validate the upstream github-actions.yml template at v0.37.1.
+# Validate the upstream github-actions.yml template at v0.38.0.
 #
 # 3 steps:
 #
-# 1. Fetch upstream `docs/ci-templates/github-actions.yml` at v0.37.1, or
+# 1. Fetch upstream `docs/ci-templates/github-actions.yml` at v0.38.0, or
 #    from the local perf-sentinel clone (PERF_SENTINEL_REPO_PATH) before
 #    that tag is published.
 # 2. Structural lint:
@@ -19,7 +19,7 @@
 #    network, and a working Linux amd64 binary URL. SKIP gracefully.
 #
 # Optional knobs:
-#   UPSTREAM_VERSION    override version (default 0.37.1)
+#   UPSTREAM_VERSION    override version (default 0.38.0)
 #   UPSTREAM_PATH       use local copy
 #   SKIP_RUNTIME=1      skip act parse step
 
@@ -31,7 +31,7 @@ TMP_DIR="/tmp/${SCENARIO}"
 SCENARIO_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAB_ROOT="$(cd "${SCENARIO_DIR}/../.." && pwd)"
 
-UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.37.1}"
+UPSTREAM_VERSION="${UPSTREAM_VERSION:-0.38.0}"
 PERF_SENTINEL_REPO_PATH="${PERF_SENTINEL_REPO_PATH:-${HOME}/RustroverProjects/perf-sentinel}"
 UPSTREAM_URL="https://raw.githubusercontent.com/Institut-du-Numerique-Responsable/perf-sentinel/v${UPSTREAM_VERSION}/docs/ci-templates/github-actions.yml"
 # rhysd/actionlint is a lightweight GHA workflow validator (no runtime,
