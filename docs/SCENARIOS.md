@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 106 scenarios live under `scenarios/<name>/` and each one ships a
+The 107 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -197,10 +197,11 @@ Findings produced by the standard rule omit the field.
 | [`card-signal`](#card-signal-0390-runs-under-a-watched-threshold) | 0.39.0 card signal: a Hub `watch` list makes the daemon count runs at or under a slow threshold (`below_threshold_passes`, `detections: 0`), `thresholds` on each day, nothing without `watch`, the list lost on restart | local binary | PASS   |
 | [`card-cli`](#card-cli-0390-share-card-commands) | 0.39.0 share cards: keygen, render of 3 angles in png/pdf/svg/jxl, verify-card offline, a retouched PNG, C3 refusals, `--online` through a fake DoH and well-known origin | local binary | PASS   |
 | [`hub-recap`](#hub-recap-090-review-recap-reports-and-deliveries) | Hub 0.9.0 recap: the 0.38.0 day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader | local Hub + local binary | PASS   |
+| [`hub-card`](#hub-card-0100-share-cards) | Hub 0.10.0 share cards: a closed week's confirmed fix, a story card in png/svg/jxl/pdf that `verify-card` checks offline, key rotation and revocation, the watch list to a real 0.39.0 daemon, `cards.write`, the render limit | local Hub + local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 106
+`grouping-identity` is the 0.11 contract gate. The lab now ships 107
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -372,6 +373,9 @@ daemons to a windowed read of the Hub, without the cluster. It has its own secti
 `hub-recap` is the 0.38.0 and 0.9.0 addition, the review recap from a carbon-scoring daemon to
 the frozen reports a subscription signs and mails, without the cluster. It has its own section too.
 
+`hub-card` is the 0.39.0 and 0.10.0 addition, the share card from a real daemon's push to a
+signed file the engine verifies offline, without the cluster. It has its own section too.
+
 `hub-disclosures` is the 0.31.0 and 0.7.0 addition: a CI publishes a periodic disclosure, the
 Hub checks and renders it, shares it through a link `verify-hash --url` reaches over https, refuses
 edited figures and an internal report, and signs a webhook per event. It has its own section too.
@@ -385,7 +389,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 106. Each validated version is recorded in
+The release gate runs all 107. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -450,7 +454,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 106 (sequential, long-running-drift is the long pole)
+# All 107 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1520,7 +1524,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 106 scenarios, in an order
+`make verify-all-scenarios` includes all 107 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3746,6 +3750,39 @@ key, the sealed ledger day a previous daemon instance would have pushed for yest
 8. Under access control a report one member generated is the unknown-id 404 to another reader.
 
 PASS on 0.9.0 with the 0.38.0 daemon. A Hub before 0.9.0 answers `GET /api/recap` with a 404.
+
+## hub-card (0.10.0 share cards)
+
+`make verify-hub-card`. Self-contained: a Release build of the Hub run as a local `dotnet`
+process, two 0.39.0 daemons from the local binary (one pushing, one idle that the Hub polls),
+python3 with `opentelemetry-proto`, curl. No cluster, no Docker, no network, about three minutes.
+It SKIPs with exit 0 when the daemon binary, the Hub build, `dotnet` or `opentelemetry-proto` is
+absent.
+
+`card-signal` proves the daemon against a fake Hub, `card-cli` the card commands on fixtures, the
+Hub's tests its routes on a fake clock. Here a real daemon pushes to a real Hub, which makes its
+key and its cards with the real engine. Two sources: `hcd-lab`, the daemon behind a proxy that
+records each push answer, and `hcd-week`, the daemon of the two closed weeks before this one,
+whose sealed ledger pages are imported with its key. A card needs a fix marked done inside a
+closed period, and no route sets a past done date, so with the Hub stopped one SQL UPDATE moves
+the N+1 action's done date into last week, after the route froze the daemon's own finding.
+
+1. Cards off, every card route is a 404; on, `/api/status` reads `cards: true`.
+2. A done action stores `frozen_finding_json`; leaving `done` clears it.
+3. A restarted daemon's first push answer carries `watch` with the done slow signature only, the
+   daemon counts 8 passes under the threshold on a `detections: 0` row, the Hub stores it and its
+   windowed read does not count it.
+4. The closed week's options name the fix and its volume before, sign `hcd-week` only, and the
+   week recap names `hcd-lab` in `late_sources`, by its name.
+5. A story card in png, svg, jxl and pdf passes `verify-card` offline, content intact.
+6. Rotation and revocation change the key list and the DNS lines; against the published file the
+   first card reads level 2, then `key_revoked`.
+7. Past `MaxConcurrentRenders` a render is a 503 with `Retry-After: 5`.
+8. A 300-day-old detection day outlives the default purge, not a 200-day `DetectionRetention`.
+9. Under access control a reader gets 403, a member may not manage the key, and the attachment
+   check is a 409 without `Hub:Cards:Domain`.
+
+PASS on 0.10.0 with the 0.39.0 daemon.
 
 ## hub-disclosures (0.31.0 and 0.7.0 disclosures published to the Hub)
 
