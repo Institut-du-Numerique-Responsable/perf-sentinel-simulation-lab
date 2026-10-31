@@ -40,6 +40,7 @@ header trusted, phase 3 with access control, two local accounts, no domain and
 | H6 | four parallel PDF renders past `MaxConcurrentRenders = 1` give a 200 and a 503 `Another card is being made. Try again in a few seconds.` with `Retry-After: 5` |
 | H7 | a sealed day 300 days old, past the 180-day `Hub:Retention`, outlives the boot purge under the default 1,100-day `Hub:DetectionRetention`; with 200 days it is purged at boot and the weeks before stay |
 | H8 | under access control, bob (`reader`, no `cards.write`) has no `cards` in `/api/status` and gets 403 `You may not create cards.` on options and render; alice (`member`) reads `cards: true` and the options with the fix, gets 403 `You may not manage the card signing key.` on the keys and 409 `Set Hub:Cards:Domain to check an attachment.` on `POST /api/cards/attachment` |
+| H9 | Hub 0.11.0, phase 2 with `Hub:Cards:Country=us`: the options carry `equivalence_country: us`; the H4 cards' `card.json` (copied by a wrapper around the engine, since the Hub deletes its render directory) carries `us`; a card asked with `"equivalence_country":"gb"` writes `gb`, verifies intact, and its signed payload holds no `equivalence_country` and, if any, a UK or shared row; `de` is `400 equivalence_country must be fr, gb or us.` |
 
 **What is forged, and why.** A card covers a closed period and a fix marked
 done inside it, so a run on one day needs history. The lightest honest way:

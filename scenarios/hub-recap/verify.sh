@@ -25,6 +25,9 @@
 #      attached, no @ in its HTML outside the stylesheet.
 #   R8 with access control, a report alice generated answers 404 to bob, who
 #      holds findings.read but not recaps.read, as an unknown id does.
+#   R9 (Hub 0.11.0) an on-demand report in French: `language` fr, both pages
+#      <html lang="fr">, the management page reads "Une étape sans nom dans";
+#      ?lang=en renders the same report in English.
 #
 # A daemon started today holds no sealed yesterday, and a subscription only
 # freezes a closed period. The scenario therefore pushes, with the source's
@@ -478,6 +481,26 @@ print(len(re.findall(pat, h, re.I)))' "page-${view}")"
 done
 ok "report ${REPORT_ID} (nothing_moved ${R4_NOTHING}, complete ${R4_COMPLETE}) listed; both pages 200 text/html with a CSP, no external load"
 
+# --- R9 --------------------------------------------------------------------------
+step "R9 an on-demand report in French, read back in English"
+CODE="$(req r9 POST /api/recap/reports -H 'Content-Type: application/json' -H "X-Forwarded-User: ${OWNER}" \
+  --data '{"period":"day","lang":"fr"}')"
+expect_code "R9 POST /api/recap/reports lang fr" "${CODE}" 201 r9
+FR_ID="$(py 'r = j("r9"); assert r["language"] == "fr", r; print(r["id"])')" || die "R9 the report item: $(cat "${TMP_DIR}/r9.body")"
+for view in pilotage tech; do
+  CODE="$(req "fr-${view}" GET "/recaps/${FR_ID}/${view}.html" -H "X-Forwarded-User: ${OWNER}")"
+  expect_code "R9 /recaps/${FR_ID}/${view}.html" "${CODE}" 200 "fr-${view}"
+  py 'assert "<html lang=\"fr\"" in body(sys.argv[3]), "not lang=fr"' "fr-${view}" || die "R9 ${view}.html is not in French"
+done
+# The page writes é as &#233;: compared on the decoded text.
+py 'assert ("Une étape sans nom dans " + sys.argv[3]) in __import__("html").unescape(body("fr-pilotage")), "no French unnamed step"' "${SERVICE_LABEL}" \
+  || die "R9 the French management page lacks 'Une étape sans nom dans ${SERVICE_LABEL}'"
+CODE="$(req fr-as-en GET "/recaps/${FR_ID}/pilotage.html?lang=en" -H "X-Forwarded-User: ${OWNER}")"
+expect_code "R9 ?lang=en" "${CODE}" 200 fr-as-en
+py 'h = body("fr-as-en"); assert "<html lang=\"en\"" in h and ("An unnamed step in " + sys.argv[3]) in h, "not English"' "${SERVICE_LABEL}" \
+  || die "R9 ?lang=en does not render the report in English"
+ok "report ${FR_ID}: language fr, both pages lang=fr, 'Une étape sans nom dans ${SERVICE_LABEL}'; ?lang=en renders it in English"
+
 # --- R5 --------------------------------------------------------------------------
 step "R5 the management page names people and steps in business words"
 R5="$(py 'p, t = body("page-pilotage"), body("page-tech")
@@ -706,6 +729,7 @@ ok "401 anonymous; alice 201 then 200 (report and page); bob reads the recap (20
   echo "| R2 | actions need an identity | 403 anonymous, 201 as ${OWNER}, recap in_progress by ${OWNER} |"
   echo "| R3 | labels in the pilotage view | '${ENDPOINT_LABEL}' and '${SERVICE_LABEL}', no technical key |"
   echo "| R4 | on-demand report | ${REPORT_ID}, listed, both pages 200 with a CSP, no external load |"
+  echo "| R9 | report in French (Hub 0.11.0) | ${FR_ID}, language fr, lang=fr pages, ?lang=en in English |"
   echo "| R5 | management page | '${OWNER_NAME}', 'An unnamed step in ${SERVICE_LABEL}', no @ outside <style>, no endpoint |"
   echo "| R6 | signed webhook | report ${SUB_ID}, HMAC verifies, management view only, no @ |"
   echo "| R7 | e-mail | pilotage attachment, no @ outside <style>, ${SUB_DELIVERIES} |"

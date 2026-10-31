@@ -33,6 +33,7 @@ local accounts.
 | R6 | the subscription freezes yesterday within one 15-second tick and POSTs it to a loopback receiver; `X-PerfSentinel-Signature` is `sha256=` HMAC-SHA256 of `<X-PerfSentinel-Timestamp>.<body>` under the secret (another secret does not verify), the body is the management view with no technical key, no `endpoint` and no `@`, the two URLs name the frozen pages, the delivery reads `delivered` |
 | R7 | the same report reaches a loopback SMTP sink for the subscribed address with one attachment, `perf-sentinel-recap-<day>-pilotage.html`, `text/html`, no `@` outside its `<style>`, the engineering link in the body, the delivery `delivered` |
 | R8 | under access control, a report `local:alice` (built-in `member` on `*`) generated reads 200 to her, page included; `local:bob` (`reader` on `*`) reads the recap but gets 404 on her report, on both pages and on the subscription report, with the very body an unknown id gets; bob lists none, alice her own; no session is a 401 |
+| R9 | Hub 0.11.0: `POST /api/recap/reports` with `lang: fr` gives `language: fr`, both pages `<html lang="fr">`, the management page reads `Une étape sans nom dans <service label>` (compared on the HTML-decoded text, the page writes `&#233;`); `?lang=en` renders the same report in English |
 
 The management page inlines a stylesheet with `@media` rules, so "no `@`" is
 checked outside `<style>`; the e-mail pattern is checked over the whole page.

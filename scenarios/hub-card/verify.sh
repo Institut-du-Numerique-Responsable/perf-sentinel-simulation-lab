@@ -32,6 +32,11 @@
 #   H8 under access control a reader (no cards.write) gets 403, a member reads
 #      the options, may not manage the key, and the attachment check is a 409
 #      without Hub:Cards:Domain. No network call is ever made.
+#   H9 (Hub 0.11.0) equivalence countries, phase 2 running with
+#      Hub:Cards:Country us: the options name us, a card asked without a country
+#      writes us in the engine's card.json, one asked gb writes gb and still
+#      verifies intact, and a signed payload never carries the country itself;
+#      de is a 400.
 #
 # What is forged: hcd-week's ledger pages (two sealed weeks, the planted N+1
 # counted until the day before the fix, with carbon), and, with the Hub
@@ -285,6 +290,18 @@ post_otlp() {  # $1 = payload file
 }
 
 # --- the Hub -------------------------------------------------------------------
+# The Hub's engine: the local binary, behind a wrapper that keeps a copy of each
+# card.json, since the Hub deletes its render directory once the card is made.
+HUB_ENGINE="${TMP_DIR}/engine.sh"
+cat > "${HUB_ENGINE}" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = card ] && [ "\$2" = render ]; then
+  prev=""
+  for a in "\$@"; do [ "\$prev" = --input ] && cp "\$a" "${TMP_DIR}/last-card.json"; prev="\$a"; done
+fi
+exec "${PERF_SENTINEL_LOCAL_BIN}" "\$@"
+EOF
+chmod +x "${HUB_ENGINE}"
 CARDS_ON=(Hub__Cards__Organisation="${ORG}" Hub__Cards__MaxConcurrentRenders=1)
 start_hub() {
   (
@@ -292,7 +309,7 @@ start_hub() {
     export ASPNETCORE_URLS="${HUB_URL}"
     export Hub__DatabasePath="${TMP_DIR}/hub.db"
     export Hub__Analysis__ReportDirectory="${TMP_DIR}/reports"
-    export Hub__Analysis__EngineBinaryPath="${PERF_SENTINEL_LOCAL_BIN}"
+    export Hub__Analysis__EngineBinaryPath="${HUB_ENGINE}"
     export Hub__PollInterval="00:00:02"
     export Hub__HttpTimeout="00:00:02"
     export Hub__UpdateCheck__Enabled="false"
@@ -578,8 +595,8 @@ PY
 ok "done_at_ms ${DONE_MS} (day ${DONE_DAY}, 10:00 UTC)"
 
 # ================================================================== phase 2
-step "Phase 2: the same Hub, restarted on the edited database"
-start_hub "${PHASE12[@]}"
+step "Phase 2: the same Hub, restarted on the edited database, Hub:Cards:Country us"
+start_hub "${PHASE12[@]}" Hub__Cards__Country=us
 
 step "H7 a day 300 days old outlives the boot purge (DetectionRetention 1,100 days)"
 sleep 3
@@ -647,6 +664,37 @@ assert (f["cited_ops"], f["before_fix_ops"]) == (int(cited), int(before)), f
 PY
 done
 ok "png, svg, jxl, pdf: 200 with type, filename, no-store, nosniff (SVG CSP sandboxed); verify-card exit 0, intact, level 1, ${CITED} cited, ${WANT_BEFORE} before"
+
+step "H9 equivalence countries: us by setting, gb by request, de refused"
+CODE="$(req h9-options GET "/api/cards/options?period=week&at=${W_FROM_ISO}" -H "X-Forwarded-User: ${USER_ID}")"
+expect_code "H9 options" "${CODE}" 200 h9-options
+[ "$(py 'print(j("h9-options")["equivalence_country"])')" = "us" ] || die "H9 options: $(cat "${TMP_DIR}/h9-options.body")"
+country_in_input() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("equivalence_country"))' "${TMP_DIR}/last-card.json"; }
+[ "$(country_in_input)" = "us" ] || die "H9 the H4 card.json carries '$(country_in_input)', want us from Hub:Cards:Country"
+H9_BODY='{"angle":"story","period":"week","at":"%s","signature":"%s","format":"svg","equivalence_country":"%s"}'
+CODE="$(curl -sS -o "${TMP_DIR}/cards/card-gb.svg" -w '%{http_code}' --max-time 60 -X POST "${AS_USER[@]}" \
+  --data "$(printf "${H9_BODY}" "${W_FROM_ISO}" "${SIG_N}" gb)" "${HUB_URL}/api/cards/render")"
+[ "${CODE}" = "200" ] || die "H9 a gb card answered ${CODE}: $(head -c 300 "${TMP_DIR}/cards/card-gb.svg")"
+[ "$(country_in_input)" = "gb" ] || die "H9 the gb card.json carries '$(country_in_input)'"
+V="$(verify_card "${TMP_DIR}/cards/card-gb.svg")"
+python3 - "${V}" "${TMP_DIR}/cards/card-gb.svg" <<'PY' || die "H9 the gb card: ${V}"
+import base64, json, re, sys
+rc, line = sys.argv[1].split(" ", 1)
+v = json.loads(line)
+assert rc == "0" and (v["integrity"], v["content"]) == ("ok", "intact"), v
+svg = open(sys.argv[2], encoding="utf-8").read()
+env = json.loads(re.search(r'<metadata id="perf-sentinel-card">(.*?)</metadata>', svg, re.S).group(1))
+p = env["payload"]
+signed = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)))
+assert "equivalence_country" not in signed, "the payload signs the country"
+e = signed.get("equivalence")
+assert e is None or e["id"] in ("gb_rail_km", "gb_car_km", "smartphone"), e
+PY
+CODE="$(curl -sS -o "${TMP_DIR}/h9-de.body" -w '%{http_code}' --max-time 30 -X POST "${AS_USER[@]}" \
+  --data "$(printf "${H9_BODY}" "${W_FROM_ISO}" "${SIG_N}" de)" "${HUB_URL}/api/cards/render")"
+[ "${CODE}" = "400" ] && grep -q 'equivalence_country must be fr, gb or us.' "${TMP_DIR}/h9-de.body" \
+  || die "H9 de answered ${CODE}: $(cat "${TMP_DIR}/h9-de.body")"
+ok "options us; the H4 card.json us by setting, a gb card.json gb, verified intact, payload without the country; de is a 400"
 
 step "H5 the signing key, its rotation and its revocation"
 CODE="$(req h5-keys1 GET /api/cards/keys -H "X-Forwarded-User: ${USER_ID}")"
@@ -819,6 +867,7 @@ ok "alice (member): cards true, options 200 with the fix, keys 403, attachment 4
   echo "- slow ${SIG_S}: watch ${WATCH}, row (0, 8) in ledger ${LEDGER_2}"
   echo "- keys: ${FP1} rotated then revoked, ${FP2} current"
   echo "- busy: ${BUSY}"
+  echo "- countries: options us by Hub:Cards:Country, card.json us then gb, de 400"
   echo ""
   echo "PASS, ${CHECKS} checks"
 } > "${REPORT}"
