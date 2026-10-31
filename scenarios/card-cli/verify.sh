@@ -29,6 +29,12 @@
 #      gives binding_check_failed when the well-known file is 404 and
 #      binding_partial when it lists the key, both level 1, exit 4; a
 #      retouched file makes no network request.
+#   K9 equivalence_country (0.40.0): one SVG card per country signs the
+#      row of that country with its source, ADEME, DESNZ or US EPA, and no
+#      equivalence_country; under two units it signs none; tgv_km prints
+#      only on request in France; another country's row is
+#      unknown_equivalence (exit 1), a country outside fr, gb, us is
+#      malformed_input on equivalence_country (exit 3), nothing written.
 #
 # On 0.38.0 the card and verify-card subcommands do not exist and K1 fails.
 set -euo pipefail
@@ -463,6 +469,76 @@ AFTER="$(wc -l < "${NET_LOG}")"
 [ "${AFTER}" = "${BEFORE}" ] || die "K8f a content_modified file sent $((AFTER - BEFORE)) request(s) under --online"
 ok "retouched file under --online: content_modified, no request"
 
+step "K9 one card per country takes that country's row, signed with its source"
+# $1 = id, $2 = country, $3 = co2_low_ug, $4 = chosen equivalence or "", $5 = output dir.
+country_input() {
+  python3 - "${FIXTURES}/story.json" "$2" "$3" "$4" > "${TMP_DIR}/$1.json" <<'PY'
+import json, sys
+card = json.load(open(sys.argv[1]))
+card["equivalence_country"] = sys.argv[2]
+card["figures"]["co2_low_ug"] = int(sys.argv[3])
+if sys.argv[4]:
+    card["equivalence"] = sys.argv[4]
+print(json.dumps(card))
+PY
+}
+# Prints the signed equivalence id and source of an SVG card, or "none".
+signed_equivalence() {
+  python3 - "$1" <<'PY'
+import base64, json, re, sys
+svg = open(sys.argv[1], encoding="utf-8").read()
+envelopes = re.findall(r'<metadata id="perf-sentinel-card">(.*?)</metadata>', svg, re.S)
+if len(envelopes) != 1:
+    sys.exit("%d card envelopes in the SVG" % len(envelopes))
+payload = json.loads(envelopes[0])["payload"]
+signed = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+if "equivalence_country" in signed:
+    sys.exit("the payload signs equivalence_country, the contract keeps it out")
+e = signed.get("equivalence")
+print("none" if e is None else "%s|%s" % (e["id"], e["source"]))
+PY
+}
+# id, country, co2_low_ug, chosen row, want "<id>|<source>" (~ for a space) or none.
+K9_CASES="fr-auto fr 12400000000 - meal|ADEME,~Base~Carbone
+gb-auto gb 12400000000 - gb_car_km|DESNZ,~GHG~conversion~factors
+us-auto us 12400000000 - us_car_mile|US~EPA,~GHG~Equivalencies~Calculator
+us-floor us 800000000 - us_car_mile|US~EPA,~GHG~Equivalencies~Calculator
+us-under us 700000000 - none
+gb-under gb 70000000 - none
+fr-tgv fr 1200000000 tgv_km tgv_km|ADEME,~Base~Carbone"
+while read -r id country co2 chosen want; do
+  [ "${chosen}" = "-" ] && chosen=""
+  country_input "${id}" "${country}" "${co2}" "${chosen}"
+  d="${TMP_DIR}/k9/${id}"
+  mkdir -p "${d}"
+  run card render --input "${TMP_DIR}/${id}.json" --signing-key "${KEY}" --out-dir "${d}" --format svg
+  [ "${RC}" = "0" ] || die "K9 ${id} render exit ${RC}: ${OUT} $(tail -2 "${TMP_DIR}/stderr.txt")"
+  run verify-card "${d}/card.svg"
+  [ "${RC}" = "0" ] || die "K9 ${id} verify-card exit ${RC}: ${OUT}"
+  expect "K9 ${id}" '{"integrity":"ok","content":"intact","level":1}'
+  got="$(signed_equivalence "${d}/card.svg")" || die "K9 ${id} ${got}"
+  [ "${got}" = "${want//\~/ }" ] || die "K9 ${id} signs ${got}, want ${want//\~/ }"
+done <<< "${K9_CASES}"
+ok "fr meal, gb gb_car_km, us us_car_mile from 12 kg; us 800 g prints 2 miles, us 700 g and gb 70 g none; fr tgv_km on request"
+
+for leg in "gb-meal gb meal 1 refused unknown_equivalence -" "us-tgv us tgv_km 1 refused unknown_equivalence -" \
+           "de-auto de - 3 input_error malformed_input equivalence_country"; do
+  read -r id country chosen want_rc want_result want_reason want_field <<< "${leg}"
+  [ "${chosen}" = "-" ] && chosen=""
+  country_input "${id}" "${country}" 12400000000 "${chosen}"
+  d="${TMP_DIR}/k9/${id}"
+  mkdir -p "${d}"
+  run card render --input "${TMP_DIR}/${id}.json" --signing-key "${KEY}" --out-dir "${d}" --format svg
+  [ "${RC}" = "${want_rc}" ] || die "K9 ${id} exit ${RC}, want ${want_rc}: ${OUT}"
+  if [ "${want_field}" = "-" ]; then
+    expect "K9 ${id}" "{\"result\":\"${want_result}\",\"reason\":\"${want_reason}\"}"
+  else
+    expect "K9 ${id}" "{\"result\":\"${want_result}\",\"reason\":\"${want_reason}\",\"field\":\"${want_field}\"}"
+  fi
+  [ -z "$(ls -A "${d}")" ] || die "K9 ${id} wrote $(ls "${d}")"
+done
+ok "a row of another country: unknown_equivalence exit 1; country de: input_error malformed_input field equivalence_country exit 3; nothing written"
+
 {
   echo "# Scenario: ${SCENARIO}"
   echo ""
@@ -478,6 +554,7 @@ ok "retouched file under --online: content_modified, no request"
   echo "| K6 | one IDAT byte changed, CRC fixed | exit 1, content_modified |"
   echo "| K7 | C3 broken | \`${K7A}\` exit 1, \`${K7B}\` exit 3, nothing written |"
   echo "| K8 | --online via a fake DoH and well-known | DNS only and both: level 2; revoked: key_revoked exit 1; DoH 500: binding_check_failed / binding_partial exit 4; retouched: no request |"
+  echo "| K9 | one card per country (0.40.0) | fr meal, gb gb_car_km, us us_car_mile signed with their source; us 800 g 2 miles, us 700 g and gb 70 g none; tgv_km on request; another country's row exit 1, country de exit 3 |"
   echo ""
   echo "Verdict: **PASS**"
 } > "${REPORT}"

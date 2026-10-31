@@ -1,6 +1,6 @@
 # card-cli
 
-The 0.39.0 share-card commands, `card keygen`, `card render` and
+The share-card commands of 0.39.0, `card keygen`, `card render` and
 `verify-card`, against the contract of the engine's `docs/SHARE-CARD.md`.
 
 ## Why it exists
@@ -29,6 +29,7 @@ The inputs are the engine's own fixtures, `tests/fixtures/card/story.json`,
 | K6 | the story PNG with one byte flipped inside `IDAT`, its CRC recomputed: exit 1 and exactly `{"integrity":"ok","content":"modified","level":1,"domain":null,"key":"unknown","reason":"content_modified","figures":null}` |
 | K7 | a story whose period starts on 2026-09-02: `{"result":"refused","reason":"period_not_calendar"}`, exit 1; a float `cited_ops`: `{"result":"input_error","reason":"malformed_input"}`, exit 3; neither writes a file |
 | K8 | `verify-card --online --doh` on a story signed for `card-lab.test`: the TXT record alone (well-known 404) and both sources give level 2, `key_published`; a record with `revoked=` gives level 1, `revoked`, `key_revoked`, exit 1; a DoH 500 gives `binding_check_failed` when the well-known file is 404 and `binding_partial` when it lists the key, both level 1, exit 4; the K6 file makes no request at all |
+| K9 | `equivalence_country` (0.40.0), one SVG story per country, its signed payload read from `<metadata id="perf-sentinel-card">`: from 12.4 kg, `fr` signs `meal` (ADEME, Base Carbone), `gb` `gb_car_km` (DESNZ, GHG conversion factors), `us` `us_car_mile` (US EPA, GHG Equivalencies Calculator); `us` at 800 g still signs `us_car_mile` (2 miles), `us` at 700 g and `gb` at 70 g sign none; `fr` with `"equivalence":"tgv_km"` signs it; the payload never carries `equivalence_country`; each card verifies intact. `gb` with `meal` and `us` with `tgv_km` are `unknown_equivalence`, exit 1; country `de` is `{"result":"input_error","reason":"malformed_input","field":"equivalence_country"}`, exit 3; none writes a file |
 
 ### How `--online` runs locally
 
