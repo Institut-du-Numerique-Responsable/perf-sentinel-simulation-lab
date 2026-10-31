@@ -68,7 +68,7 @@ BASELINE_IMAGE="${BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf
 BASELINE_NAME="fpf-baseline-$$"
 # The latest release, the reference of leg D. Bump it with the pin in
 # manifests/perf-sentinel-daemon.yaml, same digest.
-FOLD_BASELINE_IMAGE="${FOLD_BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:851cdfa6955e0ed3e6c2d1628c697e87c83e867760ea2319a9d64d99d733efaa}"  # 0.38.0
+FOLD_BASELINE_IMAGE="${FOLD_BASELINE_IMAGE:-ghcr.io/institut-du-numerique-responsable/perf-sentinel@sha256:4fc2fd60c25ea063bade42ad57142ad4ab7f358af1a0d8bc2058ed2b92208110}"  # 0.39.0
 FOLD_BASELINE_NAME="fpf-fold-baseline-$$"
 
 DAEMON_HTTP_PORT="${FPF_DAEMON_HTTP_PORT:-14828}"
