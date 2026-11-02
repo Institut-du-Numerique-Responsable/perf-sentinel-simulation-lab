@@ -6,7 +6,7 @@ validated end to end on the lab cluster, with an architecture diagram,
 the input/output capture types, the configuration knobs that matter,
 and the gotchas that bit us during validation.
 
-The 107 scenarios live under `scenarios/<name>/` and each one ships a
+The 108 scenarios live under `scenarios/<name>/` and each one ships a
 runnable `verify.sh` plus a focused `README.md`. The scripts are
 reproducible on a `make up-cni` + `make seed-services` +
 `make seed-electricity-maps` cluster.
@@ -201,7 +201,7 @@ Findings produced by the standard rule omit the field.
 
 The first nine rows are the core deployment-mode scenarios.
 `astronomy-shop` is the foreign-instrumentation replay gate.
-`grouping-identity` is the 0.11 contract gate. The lab now ships 107
+`grouping-identity` is the 0.11 contract gate. The lab now ships 108
 scenarios in total, all wired into `make verify-all-scenarios` (run
 `make help` for the full per-target list). The others cover the CI
 quality gate (`ci-shift-left`, `output-formats-coverage`), the three
@@ -389,7 +389,7 @@ Java agent attaches no `code.*` attributes to JDBC spans, so the
 plugin's navigation contract is not covered by a captured fixture and
 stays owned by the plugin's own anchor resolver tests.
 
-The release gate runs all 107. Each validated version is recorded in
+The release gate runs all 108. Each validated version is recorded in
 the upstream `release-gate/lab-validations.txt` ledger.
 
 ## Run
@@ -454,7 +454,7 @@ make verify-rpc-carrier-parity
 # Live-chaos telemetry from the OTel demo (local release binary only)
 make verify-chaos-replay
 
-# All 107 (sequential, long-running-drift is the long pole)
+# All 108 (sequential, long-running-drift is the long pole)
 make verify-all-scenarios
 ```
 
@@ -1524,7 +1524,7 @@ SKIP_RUNTIME=1 make verify-template-github-actions
 | template-jenkinsfile | jenkinsfile.groovy lint + runtime | yes | LOCAL ONLY (jenkinsfile-runner flaky) |
 | template-github-actions | github-actions.yml lint + act --list | yes | LOCAL ONLY (act-in-act convolu) |
 
-`make verify-all-scenarios` includes all 107 scenarios, in an order
+`make verify-all-scenarios` includes all 108 scenarios, in an order
 that preserves the inter-scenario artefact dependencies.
 
 `java-ci-capture` is the first lab scenario whose trace file is
@@ -3996,6 +3996,21 @@ false for the ack and incident routes once their API keys are set. Run against
 0.25.4 the scenario fails L3 only and passes the other eight. Run against
 0.25.2 it fails F1, F2, L1 and L3 and passes the other five, both observed on
 2026-10-03.
+
+## daemon-security-hardening (0.41.0, OTLP span budget, Host allow-list, include_acked)
+
+`make verify-daemon-security-hardening`. Needs Docker, a few seconds. The
+image resolves through `scripts/resolve-image.sh`.
+
+One throwaway container of the image under test listens on `0.0.0.0` with
+`[daemon] allowed_hosts = ["perf-sentinel.lab.internal"]` and a
+`[daemon.ack] api_key`. An OTLP HTTP export of 100,001 empty spans, two bytes
+each on the wire, must answer 413 and grow
+`perf_sentinel_otlp_rejected_total{reason="too_many_spans"}` by exactly 1,
+while 10 empty spans answer 200. `Host: evil.example` must answer 421, and the
+listed name, `localhost` and the IP literal 200. `GET
+/api/findings?include_acked=true` must answer 401 without a key and 200 with
+the ack key, while a plain `GET /api/findings` stays open.
 
 ## outbound-proxy-private-ca (0.25.5, outbound proxy and private CA)
 
