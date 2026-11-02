@@ -35,8 +35,10 @@ REPORT="/tmp/scenario-${SCENARIO}-report.md"
 step "Pre-flight"
 curl -fsS --max-time 10 "${DAEMON_URL}/api/status" >/dev/null \
   || die "daemon not reachable at ${DAEMON_URL}, run scripts/port-forward.sh start"
+# Not grep -q: it stops at the first match, kubectl then dies on SIGPIPE and
+# pipefail fails the check once the log outgrows the pipe buffer.
 kubectl -n "${NAMESPACE}" logs deployment/notification-service --tail=5000 \
-  | grep -q "Attempting to connect to: \[rabbitmq" \
+  | grep "Attempting to connect to: \[rabbitmq" >/dev/null \
   || die "notification-service runs no RabbitMQ listener, rebuild it with make seed-services"
 ok "daemon reachable, consumer connected"
 
