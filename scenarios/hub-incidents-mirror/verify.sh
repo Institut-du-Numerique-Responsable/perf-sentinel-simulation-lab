@@ -180,11 +180,13 @@ hub_api() {
 
 # Reads the fleet now instead of waiting out PollInterval. The gate admits two
 # concurrent reads and answers 503 past that, so a run alongside an open
-# incidents screen retries rather than failing.
+# incidents screen retries rather than failing. Since Hub 0.12.0 a refresh
+# without a JSON content type is a 415, as an ack is.
 hub_refresh() {  # $1 = optional query string
   local i code
   for i in $(seq 1 10); do
-    code="$(hub_api POST "/api/incidents/refresh${1:-}")"
+    code="$(curl -s -o "${TMP_DIR}/body" -w '%{http_code}' -X POST \
+      -H 'Content-Type: application/json' "http://127.0.0.1:${HUB_PORT}/api/incidents/refresh${1:-}")"
     [ "${code}" = "200" ] && return 0
     sleep 2
   done
