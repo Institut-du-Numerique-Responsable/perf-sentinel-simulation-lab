@@ -351,13 +351,14 @@ else
 fi
 
 # The discriminator for leg D, posted here so the single refresh in leg C
-# carries both incidents to the Hub.
+# carries both incidents to the Hub. Kind other: since 0.42.0 the daemon drops
+# deploy and restart alerts unless [daemon.incidents] ignored_kinds says so.
 GHOST_CODE="$(daemon_api POST /api/incidents \
-  "$(alert_body "${GHOST_SERVICE}" deploy "${GHOST_NS}" "${STARTS}" "rollout started")" \
+  "$(alert_body "${GHOST_SERVICE}" other "${GHOST_NS}" "${STARTS}" "rollout started")" \
   "${WRITE_KEY}")"
 if [ "${GHOST_CODE}" = "200" ]; then
   ok "the discriminator incident is recorded, leg D has something to exclude"
-  record "the discriminator incident is posted" PASS "${GHOST_NS}/${GHOST_SERVICE}, kind deploy"
+  record "the discriminator incident is posted" PASS "${GHOST_NS}/${GHOST_SERVICE}, kind other"
 else
   fail "the second incident was refused with HTTP ${GHOST_CODE}, leg D would have nothing to exclude"
   record "the discriminator incident is posted" FAIL "HTTP ${GHOST_CODE}"

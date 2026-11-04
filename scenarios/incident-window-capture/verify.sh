@@ -40,6 +40,10 @@
 #      outage is destroyed by the outage. The NDJSON archive is written by one
 #      task opened at startup, owner-only, one line per record, and a symlinked
 #      path fails the daemon rather than the first incident.
+#   I. Ignored kinds (0.42.0). Without [daemon.incidents] ignored_kinds a deploy
+#      and a restart alert are answered 200, counted in the intake body's
+#      `ignored` and in perf_sentinel_incidents_ignored_total{kind}, and never
+#      recorded, so a rollout fills neither the ring nor the Hub.
 #   F. The window form of `/api/findings`. `until_ms` folds over the
 #      detections inside the window alone, so `seen_count` describes the
 #      window, and `/api/status` reports `oldest_finding_ms`, which is what
@@ -728,6 +732,37 @@ if [ "${A_ROWS}" -ge 3 ] && [ "${A_IDS}" = "2" ] && [ "${A_MAXF}" -ge "${FROZEN_
 else
   fail "lines=${A_ROWS} (raw ${LINES}), ids=${A_IDS}, max findings=${A_MAXF}, ended=${A_ENDED}"
   record "archive complete and intact" FAIL "${A_ROWS}/${A_IDS}/${A_MAXF}/${A_ENDED}"
+fi
+
+# === Leg I: deploy and restart dropped by default ===
+step "I. A deploy and a restart are acknowledged and dropped by default"
+write_config "${TMP_DIR}/ignored.ndjson"
+start_daemon "d-ignored.log" || die "daemon did not start: $(tail -5 "${TMP_DIR}/d-ignored.log")"
+IGNORED_BODY="$(python3 -c "
+import json, sys
+starts = sys.argv[1]
+print(json.dumps({'version': '4', 'alerts': [
+    {'status': 'firing', 'labels': {'service': 'shop-svc', 'perf_sentinel_kind': kind},
+     'startsAt': starts, 'endsAt': '0001-01-01T00:00:00Z'}
+    for kind in ('deploy', 'restart')]}))
+" "${STARTS}")"
+CODE_I="$(api POST /api/incidents "${IGNORED_BODY}" "${API_KEY}")"
+INTAKE_I="$(cat "${TMP_DIR}/body")"
+I_IGNORED="$(echo "${INTAKE_I}" | jqp "d.get('ignored', 'absent')")"
+I_RECORDED="$(echo "${INTAKE_I}" | jqp "d.get('recorded')")"
+api GET "/api/incidents?limit=100" "" "" "Bearer ${READ_KEY}" >/dev/null
+I_LISTED="$(jqp "len(d)" < "${TMP_DIR}/body")"
+I_DEPLOY="$(metric 'perf_sentinel_incidents_ignored_total{kind="deploy"}')"
+I_RESTART="$(metric 'perf_sentinel_incidents_ignored_total{kind="restart"}')"
+I_OOM="$(metric 'perf_sentinel_incidents_ignored_total{kind="oom_kill"}')"
+stop_daemon
+if [ "${CODE_I}" = "200" ] && [ "${I_IGNORED}" = "2" ] && [ "${I_RECORDED}" = "0" ] && [ "${I_LISTED}" = "0" ] \
+   && [ "${I_DEPLOY}" = "1" ] && [ "${I_RESTART}" = "1" ] && [ "${I_OOM}" = "0" ]; then
+  ok "200, ignored=2, recorded=0, none listed, ignored_total deploy=1 restart=1 oom_kill=0"
+  record "deploy and restart ignored by default" PASS "ignored=2, recorded=0, counted by kind"
+else
+  fail "HTTP ${CODE_I}, ignored=${I_IGNORED}, recorded=${I_RECORDED}, listed=${I_LISTED}, deploy=${I_DEPLOY}, restart=${I_RESTART}, oom_kill=${I_OOM}"
+  record "deploy and restart ignored by default" FAIL "HTTP ${CODE_I}, ignored=${I_IGNORED}"
 fi
 
 ln -s "${TMP_DIR}/real-target.ndjson" "${TMP_DIR}/linked.ndjson"
