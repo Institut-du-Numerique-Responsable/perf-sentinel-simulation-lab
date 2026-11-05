@@ -4012,6 +4012,21 @@ listed name, `localhost` and the IP literal 200. `GET
 /api/findings?include_acked=true` must answer 401 without a key and 200 with
 the ack key, while a plain `GET /api/findings` stays open.
 
+## memory-guard-band-release (0.42.1, memory guard release on a real cgroup)
+
+`make verify-memory-guard-band-release`. Needs Docker with cgroup v2, about 9
+minutes. The image resolves through `scripts/resolve-image.sh`.
+
+One throwaway container runs with `memory_high_water_pct = 85`, and `docker
+update --memory` moves `memory.max` live to place the working-set ratio above the
+mark, inside the band or below it. Above the mark the gauge reads 1, an OTLP
+export answers 503 and `perf_sentinel_otlp_rejected_total{reason="memory_pressure"}`
+grows by 1, and a ratio parked there stays rejected past the hold. Inside the band
+the guard releases after 60 seconds with one `memory working set held at` warning.
+A ratio alternating around the mark releases too, and a second daemon with
+`trace_ttl_ms = 90000` holds for 90 seconds. Against 0.42.0 the export still
+answers 503 inside the band, so B1, B2, B3, O1, T1 and T2 fail.
+
 ## outbound-proxy-private-ca (0.25.5, outbound proxy and private CA)
 
 `make verify-outbound-proxy-private-ca`. A local release binary, openssl,

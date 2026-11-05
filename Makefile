@@ -53,7 +53,7 @@ PERF_SENTINEL_LOCAL_BIN ?= $(PERF_SENTINEL_REPO_PATH)/target/release/perf-sentin
         verify-java-ci-file-export \
         verify-micrometer-http-client \
         verify-hibernate-alias-suggestion verify-ack-store-fsgroup-root verify-outbound-proxy-private-ca \
-        verify-daemon-security-hardening \
+        verify-daemon-security-hardening verify-memory-guard-band-release \
         verify-ci-e2e-jenkins verify-ci-e2e-github verify-ci-e2e-gitlab \
         verify-archive-integrity-chain verify-archive-window-drops verify-config-fragments \
         verify-incident-window-capture verify-incident-namespace-scope \
@@ -247,6 +247,7 @@ validate: ## Validate manifests, helm values, dashboards, scripts (no cluster)
 	@bash -n scenarios/hibernate-alias-suggestion/verify.sh
 	@bash -n scenarios/ack-store-fsgroup-root/verify.sh
 	@bash -n scenarios/daemon-security-hardening/verify.sh
+	@bash -n scenarios/memory-guard-band-release/verify.sh
 	@bash -n scenarios/outbound-proxy-private-ca/verify.sh
 	@bash -n scenarios/ci-e2e-common/render-check.sh
 	@bash -n scenarios/ci-e2e-jenkins/verify.sh
@@ -776,6 +777,9 @@ verify-ack-store-fsgroup-root: ## 0.25.3 daemon: no warning at start when the ac
 
 verify-daemon-security-hardening: ## 0.41.0 daemon: OTLP span budget 413 + too_many_spans counter, [daemon] allowed_hosts 421, include_acked behind the ack key (docker image, no cluster)
 	./scenarios/daemon-security-hardening/verify.sh
+
+verify-memory-guard-band-release: ## 0.42.1 daemon: memory guard band release, oscillation and trace_ttl_ms hold on a real cgroup v2 limit (docker image, no cluster)
+	./scenarios/memory-guard-band-release/verify.sh
 
 verify-outbound-proxy-private-ca: ## 0.25.5 HTTPS_PROXY/ALL_PROXY/NO_PROXY/SSL_CERT_FILE through a CONNECT proxy to a private-CA origin, plus the daemon TLS listener (local binary + docker, no cluster)
 	./scenarios/outbound-proxy-private-ca/verify.sh
