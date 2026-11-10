@@ -75,7 +75,7 @@ data:
     # would put a plain `make up` into CrashLoopBackOff on every cluster that
     # has no Hub built yet.
     [daemon.hub_export]
-    enabled = true
+    enabled = false
     endpoint = "http://perf-sentinel-hub.observability.svc.cluster.local:8080/api/import/findings"
     source_id = "lab-daemon"
     api_key_file = "/etc/perf-sentinel-hub/import-key"
