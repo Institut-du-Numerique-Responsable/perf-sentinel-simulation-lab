@@ -2579,6 +2579,26 @@ two ack signatures, the exact re-keying the separator rule was written
 to prevent, on the exact language it was written for. Reported
 upstream. The gate stays red until the fix lands.
 
+## path-id-masking (0.44.0, path ids as `{id}`)
+
+`make verify-path-id-masking`. Self-contained: a local release binary, committed
+OTLP/JSON, Jaeger and Zipkin fixtures, and a baseline written by the published
+0.43.2 binary, plus a throwaway loopback daemon. No cluster, about 10 seconds.
+
+Six dossier codes (`K7QX2P`, `R4TN8W`, ...) and six Mongo ObjectIds read one by
+one each fire one `n_plus_one_http` on a `{id}` template, while `H264` and
+`H265` stay two `redundant_http` findings and the RPC service `WAFV2` keeps its
+name. A SERVER span with `url.path` and no `http.route` gives
+`/api/dossiers/{id}` over OTLP, and an `http.target` does the same over Jaeger
+and Zipkin, while two `http.route` versions (`/rest/api/2/...`,
+`/rest/api/3/...`) stay two endpoints. `report --before` the 0.43.2 baseline
+lists no new finding, no resolved one and no endpoint delta. An ack written on
+the 0.43.2 signature of `/api/dossiers/K7QX2P` warns with the masked signature
+to acknowledge again, and the finding still fires. A loopback daemon fed the
+same spans over OTLP/protobuf serves the masked endpoint and counts both
+dossiers on one `/api/detections` row. Against 0.43.2, P1, P2, E1, E1b, E3, E4,
+W1, W2, K1 and K2 fail.
+
 ## broker-messaging-waste (messaging ingestion + broker energy)
 
 `make verify-broker-messaging-waste`. Self-contained: a local release

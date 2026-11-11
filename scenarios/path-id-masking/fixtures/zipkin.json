@@ -1,0 +1,130 @@
+[
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003100",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500000000,
+  "duration": 3000,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 1",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003101",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500020000,
+  "duration": 3400,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 2",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003102",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500040000,
+  "duration": 3800,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 3",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003103",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500060000,
+  "duration": 4200,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 4",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003104",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500080000,
+  "duration": 4600,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 5",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003105",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500100000,
+  "duration": 5000,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 6",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003106",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500120000,
+  "duration": 5400,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 7",
+   "http.target": "/api/orders/43"
+  }
+ },
+ {
+  "traceId": "00000000000000000000000000000031",
+  "id": "0000000000003107",
+  "name": "query",
+  "kind": "CLIENT",
+  "timestamp": 1780000500140000,
+  "duration": 5800,
+  "localEndpoint": {
+   "serviceName": "zipkin-svc"
+  },
+  "tags": {
+   "db.system": "postgresql",
+   "db.statement": "SELECT * FROM order_line WHERE order_id = 8",
+   "http.target": "/api/orders/43"
+  }
+ }
+]

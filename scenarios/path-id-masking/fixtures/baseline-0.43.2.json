@@ -1,0 +1,284 @@
+{
+  "analysis": {
+    "duration_ms": 0,
+    "events_processed": 32,
+    "traces_analyzed": 4,
+    "ingest": {
+      "spans_received": 36,
+      "spans_filtered": 4,
+      "filtered_not_io": 4,
+      "filtered_missing_db_statement": 0,
+      "filtered_missing_http_url": 0,
+      "filtered_non_sql_datastore": 0,
+      "filtered_merged_db_span": 0,
+      "usable_span_ratio": 1.0
+    }
+  },
+  "findings": [
+    {
+      "type": "n_plus_one_sql",
+      "severity": "warning",
+      "trace_id": "0000000000000000000000000000000b",
+      "service": "crm-svc",
+      "source_endpoint": "/api/dossiers/K7QX2P",
+      "pattern": {
+        "template": "SELECT * FROM dossier_line WHERE dossier_id = ?",
+        "occurrences": 8,
+        "window_ms": 140,
+        "distinct_params": 8,
+        "span_duration_us_p50": 4200,
+        "span_duration_us_p99": 5800,
+        "span_duration_cv_x1000": 208
+      },
+      "suggestion": "Use `WHERE ... IN (?)` to batch 8 queries into one",
+      "first_timestamp": "2026-05-28T20:30:00.010Z",
+      "last_timestamp": "2026-05-28T20:30:00.150Z",
+      "green_impact": {
+        "estimated_extra_io_ops": 7,
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      "confidence": "local_batch",
+      "instrumentation_scopes": [
+        "path-id-masking"
+      ],
+      "signature": "n_plus_one_sql:crm-svc:_api_dossiers_K7QX2P:790c89d3ee98641162f5abb4925dcddc"
+    },
+    {
+      "type": "n_plus_one_sql",
+      "severity": "warning",
+      "trace_id": "0000000000000000000000000000000c",
+      "service": "crm-svc",
+      "source_endpoint": "/api/dossiers/R4TN8W",
+      "pattern": {
+        "template": "SELECT * FROM dossier_line WHERE dossier_id = ?",
+        "occurrences": 8,
+        "window_ms": 140,
+        "distinct_params": 8,
+        "span_duration_us_p50": 4200,
+        "span_duration_us_p99": 5800,
+        "span_duration_cv_x1000": 208
+      },
+      "suggestion": "Use `WHERE ... IN (?)` to batch 8 queries into one",
+      "first_timestamp": "2026-05-28T20:30:20.010Z",
+      "last_timestamp": "2026-05-28T20:30:20.150Z",
+      "green_impact": {
+        "estimated_extra_io_ops": 7,
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      "confidence": "local_batch",
+      "instrumentation_scopes": [
+        "path-id-masking"
+      ],
+      "signature": "n_plus_one_sql:crm-svc:_api_dossiers_R4TN8W:790c89d3ee98641162f5abb4925dcddc"
+    },
+    {
+      "type": "n_plus_one_sql",
+      "severity": "warning",
+      "trace_id": "0000000000000000000000000000000d",
+      "service": "jira-svc",
+      "source_endpoint": "/rest/api/2/issue/{key}",
+      "pattern": {
+        "template": "SELECT * FROM dossier_line WHERE dossier_id = ?",
+        "occurrences": 8,
+        "window_ms": 140,
+        "distinct_params": 8,
+        "span_duration_us_p50": 4200,
+        "span_duration_us_p99": 5800,
+        "span_duration_cv_x1000": 208
+      },
+      "suggestion": "Use `WHERE ... IN (?)` to batch 8 queries into one",
+      "first_timestamp": "2026-05-28T20:30:40.010Z",
+      "last_timestamp": "2026-05-28T20:30:40.150Z",
+      "green_impact": {
+        "estimated_extra_io_ops": 7,
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      "confidence": "local_batch",
+      "instrumentation_scopes": [
+        "path-id-masking"
+      ],
+      "signature": "n_plus_one_sql:jira-svc:_rest_api_2_issue_{key}:790c89d3ee98641162f5abb4925dcddc"
+    },
+    {
+      "type": "n_plus_one_sql",
+      "severity": "warning",
+      "trace_id": "0000000000000000000000000000000e",
+      "service": "jira-svc",
+      "source_endpoint": "/rest/api/3/issue/{key}",
+      "pattern": {
+        "template": "SELECT * FROM dossier_line WHERE dossier_id = ?",
+        "occurrences": 8,
+        "window_ms": 140,
+        "distinct_params": 8,
+        "span_duration_us_p50": 4200,
+        "span_duration_us_p99": 5800,
+        "span_duration_cv_x1000": 208
+      },
+      "suggestion": "Use `WHERE ... IN (?)` to batch 8 queries into one",
+      "first_timestamp": "2026-05-28T20:31:00.010Z",
+      "last_timestamp": "2026-05-28T20:31:00.150Z",
+      "green_impact": {
+        "estimated_extra_io_ops": 7,
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      "confidence": "local_batch",
+      "instrumentation_scopes": [
+        "path-id-masking"
+      ],
+      "signature": "n_plus_one_sql:jira-svc:_rest_api_3_issue_{key}:790c89d3ee98641162f5abb4925dcddc"
+    }
+  ],
+  "green_summary": {
+    "total_io_ops": 32,
+    "avoidable_io_ops": 28,
+    "total_sql_io_ops": 32,
+    "avoidable_sql_io_ops": 28,
+    "total_messaging_io_ops": 0,
+    "avoidable_messaging_io_ops": 0,
+    "io_waste_ratio": 0.875,
+    "io_waste_ratio_band": "critical",
+    "top_offenders": [
+      {
+        "endpoint": "/api/dossiers/K7QX2P",
+        "service": "crm-svc",
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      {
+        "endpoint": "/api/dossiers/R4TN8W",
+        "service": "crm-svc",
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      {
+        "endpoint": "/rest/api/2/issue/{key}",
+        "service": "jira-svc",
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      },
+      {
+        "endpoint": "/rest/api/3/issue/{key}",
+        "service": "jira-svc",
+        "io_intensity_score": 8.0,
+        "io_intensity_band": "high"
+      }
+    ],
+    "co2": {
+      "total": {
+        "low": 0.002,
+        "mid": 0.004,
+        "high": 0.008,
+        "model": "io_proxy_v1",
+        "methodology": "sci_v1_numerator+transport"
+      },
+      "avoidable": {
+        "low": 0.0,
+        "mid": 0.0,
+        "high": 0.0,
+        "model": "io_proxy_v1",
+        "methodology": "sci_v1_operational_ratio"
+      },
+      "operational_gco2": 0.0,
+      "embodied_gco2": 0.004,
+      "sci_per_trace": {
+        "low": 0.0005,
+        "mid": 0.001,
+        "high": 0.002,
+        "model": "io_proxy_v1",
+        "methodology": "sci_v1_intensity"
+      },
+      "functional_unit": "trace"
+    },
+    "regions": [
+      {
+        "status": "unresolved",
+        "region": "unknown",
+        "grid_intensity_gco2_kwh": 0.0,
+        "pue": 0.0,
+        "io_ops": 32,
+        "co2_gco2": 0.0,
+        "intensity_source": "annual"
+      }
+    ],
+    "scoring_config": {
+      "api_version": "v4",
+      "emission_factor_type": "lifecycle",
+      "temporal_granularity": "hourly",
+      "electricity_maps": false,
+      "embodied_per_request_gco2": 0.001,
+      "network_energy_per_byte_kwh": 4e-11,
+      "per_operation_coefficients": true,
+      "use_hourly_profiles": true
+    },
+    "energy_kwh": 0.0,
+    "energy_model": ""
+  },
+  "quality_gate": {
+    "passed": false,
+    "rules": [
+      {
+        "rule": "n_plus_one_sql_critical_max",
+        "threshold": 0.0,
+        "actual": 0.0,
+        "passed": true
+      },
+      {
+        "rule": "n_plus_one_http_warning_max",
+        "threshold": 3.0,
+        "actual": 0.0,
+        "passed": true
+      },
+      {
+        "rule": "n_plus_one_messaging_warning_max",
+        "threshold": 3.0,
+        "actual": 0.0,
+        "passed": true
+      },
+      {
+        "rule": "io_waste_ratio_max",
+        "threshold": 0.3,
+        "actual": 0.875,
+        "passed": false
+      }
+    ]
+  },
+  "per_endpoint_io_ops": [
+    {
+      "service": "crm-svc",
+      "endpoint": "/api/dossiers/K7QX2P",
+      "io_ops": 8
+    },
+    {
+      "service": "crm-svc",
+      "endpoint": "/api/dossiers/R4TN8W",
+      "io_ops": 8
+    },
+    {
+      "service": "jira-svc",
+      "endpoint": "/rest/api/2/issue/{key}",
+      "io_ops": 8
+    },
+    {
+      "service": "jira-svc",
+      "endpoint": "/rest/api/3/issue/{key}",
+      "io_ops": 8
+    }
+  ],
+  "binary_version": "0.43.2",
+  "detection_config": {
+    "n_plus_one_threshold": 5,
+    "window_ms": 500,
+    "slow_threshold_ms": 500,
+    "slow_min_occurrences": 3,
+    "max_fanout": 20,
+    "chatty_service_min_calls": 15,
+    "pool_saturation_concurrent_threshold": 10,
+    "serialized_min_sequential": 3,
+    "sanitizer_aware_classification": "auto",
+    "sanitizer_aware_min_cv": 0.5
+  }
+}
