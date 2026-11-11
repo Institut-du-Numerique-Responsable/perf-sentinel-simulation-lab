@@ -7,7 +7,7 @@
 #
 # Build with:  docker build -t mutiny-svc:s2 services/mutiny-svc
 
-FROM eclipse-temurin:25.0.4_7-jdk-alpine AS builder
+FROM eclipse-temurin:25.0.5_8-jdk-alpine AS builder
 
 WORKDIR /build
 COPY pom.xml /build/pom.xml
