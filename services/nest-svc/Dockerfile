@@ -7,7 +7,7 @@
 # Build with:  docker build -t nest-svc:s1 services/nest-svc
 
 # ---- builder ----
-FROM node:24-bookworm-slim AS builder
+FROM node:26-bookworm-slim AS builder
 WORKDIR /build
 
 COPY package.json package-lock.json* ./
