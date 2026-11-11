@@ -18,7 +18,7 @@ RUN apk add --no-cache wget \
 # so we copy all of them even when building only one. With `-pl
 # ${SERVICE_NAME} -am` Maven still only compiles the requested module
 # plus its dependencies (shared-config).
-FROM eclipse-temurin:25.0.4_7-jdk-alpine AS builder
+FROM eclipse-temurin:25.0.5_8-jdk-alpine AS builder
 ARG SERVICE_NAME
 WORKDIR /build
 COPY .mvn .mvn

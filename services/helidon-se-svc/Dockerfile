@@ -14,7 +14,7 @@ RUN apk add --no-cache wget \
  && echo "${OTEL_AGENT_SHA256}  /opentelemetry-javaagent.jar" | sha256sum -c -
 
 # ---- builder ----
-FROM eclipse-temurin:25.0.4_7-jdk-alpine AS builder
+FROM eclipse-temurin:25.0.5_8-jdk-alpine AS builder
 
 WORKDIR /build
 COPY pom.xml /build/pom.xml
