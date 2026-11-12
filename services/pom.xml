@@ -15,7 +15,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.6</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -31,8 +31,11 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <postgresql.version>42.7.4</postgresql.version>
-        <flyway.version>11.0.0</flyway.version>
+        <!-- Boot 4.1.2 manages Flyway 12.4.0 and amqp-client 5.30.0: pin the latest stable. -->
+        <flyway.version>13.12.1</flyway.version>
+        <rabbit-amqp-client.version>5.37.1</rabbit-amqp-client.version>
+        <!-- OTel API bundled by the javaagent 2.33.1 (Boot manages 1.62.0); keep it no newer than the agent's. -->
+        <opentelemetry.version>1.67.0</opentelemetry.version>
     </properties>
 
     <dependencyManagement>
@@ -42,30 +45,6 @@
                 <artifactId>shared-config</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.postgresql</groupId>
-                <artifactId>postgresql</artifactId>
-                <version>${postgresql.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.flywaydb</groupId>
-                <artifactId>flyway-database-postgresql</artifactId>
-                <version>${flyway.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <build>
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-maven-plugin</artifactId>
-                    <configuration>
-                        <executable>true</executable>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
-    </build>
 </project>

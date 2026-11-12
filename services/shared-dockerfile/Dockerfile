@@ -7,8 +7,8 @@
 # Stage 1: download the OpenTelemetry Java agent. Cached independently
 # from the maven build so source changes do not refetch the jar.
 FROM alpine:3.24 AS otel-agent
-ARG OTEL_AGENT_VERSION=2.30.0
-ARG OTEL_AGENT_SHA256=9d6bc2ad8dd8fb7f730984988e57b8ac0a82d81c7b3b8ae795378718733a509d
+ARG OTEL_AGENT_VERSION=2.33.1
+ARG OTEL_AGENT_SHA256=e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149
 RUN apk add --no-cache wget \
  && wget -q -O /opentelemetry-javaagent.jar \
     "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar" \
@@ -38,7 +38,7 @@ RUN --mount=type=cache,target=/root/.m2,sharing=locked \
 RUN cp ${SERVICE_NAME}/target/${SERVICE_NAME}-*.jar /build/app.jar
 
 # Stage 3: distroless runtime. No shell, nonroot user (UID 65532).
-FROM gcr.io/distroless/java25:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot
 COPY --from=builder /build/app.jar /app/app.jar
 COPY --from=otel-agent /opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
 ENV JAVA_TOOL_OPTIONS="-javaagent:/otel/opentelemetry-javaagent.jar"
