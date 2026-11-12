@@ -17,7 +17,7 @@ RUN apk add --no-cache maven && \
 COPY src /build/src
 RUN mvn -B -ntp package -DskipTests -Dquarkus.package.jar.type=fast-jar
 
-FROM gcr.io/distroless/java25:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot
 
 COPY --from=builder /build/target/quarkus-app/ /app/
 
