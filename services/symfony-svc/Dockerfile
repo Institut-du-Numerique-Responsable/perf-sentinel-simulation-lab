@@ -11,13 +11,13 @@
 #
 # Single-stage (ponytail): the opentelemetry PECL extension must be present at
 # runtime. Build with: docker build -t symfony-svc:s1 services/symfony-svc
-FROM php:8.5-cli-bookworm
+FROM php:8.5-cli-trixie
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       git unzip libpq-dev $PHPIZE_DEPS \
  && docker-php-ext-install -j"$(nproc)" pdo_pgsql sockets \
- && pecl install opentelemetry-1.2.1 \
+ && pecl install opentelemetry-1.5.0 \
  && docker-php-ext-enable opentelemetry \
  && apt-get purge -y --auto-remove $PHPIZE_DEPS \
  && rm -rf /var/lib/apt/lists/*
