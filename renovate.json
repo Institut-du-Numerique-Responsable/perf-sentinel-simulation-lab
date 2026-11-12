@@ -83,6 +83,24 @@
       "enabled": false
     },
     {
+      "description": "Runtimes with an LTS line stay on it: .NET LTS majors are even (10, 12, ...); 11 is STS",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["mcr.microsoft.com/dotnet/sdk", "mcr.microsoft.com/dotnet/aspnet"],
+      "allowedVersions": "/^\\d*[02468]\\./"
+    },
+    {
+      "description": "Node LTS majors are even (26, 28, ...); odd majors never reach LTS",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "allowedVersions": "/^\\d*[02468](\\.|-|$)/"
+    },
+    {
+      "description": "Java LTS every four majors (25, 29, 33); non-LTS 26/27/28 are skipped. Extend the list at the next LTS",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "allowedVersions": "/^(25|29|33)[._-]/"
+    },
+    {
       "description": "Hold helm/helm major (v4): isolated, non-automerged, labeled",
       "matchPackageNames": ["helm/helm"],
       "matchUpdateTypes": ["major"],
