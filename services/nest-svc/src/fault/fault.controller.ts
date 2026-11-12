@@ -11,7 +11,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import { SpanKind, SpanStatusCode, context, trace } from '@opentelemetry/api';
+import { suppressTracing } from '@opentelemetry/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { PgPoolService } from '../prisma/pg-pool.service';
 import { MessagingService } from './messaging.service';
@@ -108,7 +109,12 @@ export class FaultController {
         },
         async (span) => {
           try {
-            return await this.prisma.payment.count({ where: { customerId: 1n } });
+            // This span carries the literal the redundant contract needs (Prisma only
+            // emits `$1`), so the Prisma/pg spans under it are suppressed: one query, one event.
+            // The await stays inside: a PrismaPromise only runs on `then`, which must see this context.
+            return await context.with(suppressTracing(context.active()), async () =>
+              await this.prisma.payment.count({ where: { customerId: 1n } }),
+            );
           } catch (error) {
             const exception = error instanceof Error ? error : new Error(String(error));
             span.recordException(exception);
