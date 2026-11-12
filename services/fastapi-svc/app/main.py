@@ -68,7 +68,10 @@ def _init_otel():
 async def _init_db():
     eng = create_async_engine(DB_DSN, pool_size=10, max_overflow=0,
                               connect_args={"timeout": 10})
-    SQLAlchemyInstrumentor().instrument(engine=eng.sync_engine)
+    # shortcut: opentelemetry-instrumentation-sqlalchemy 0.66b2 declares sqlalchemy<2.1 and
+    # silently no-ops on 2.1, so the dependency check is skipped; drop skip_dep_check once
+    # the instrumentation's supported range includes 2.1.
+    SQLAlchemyInstrumentor().instrument(engine=eng.sync_engine, skip_dep_check=True)
     session_factory = sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)
     return eng, session_factory
 
