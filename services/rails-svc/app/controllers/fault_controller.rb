@@ -26,7 +26,9 @@ class FaultController < ApplicationController
     repeats = int_param(:repeats, 10)
     start = monotonic
     total = 0
-    repeats.times { total += Payment.where(customer_id: 1).to_a.size }
+    # uncached: the per-request query cache would answer the repeats without a round trip.
+    # Literal condition: a bound `$1` hides that the params repeat, so strict mode reads it as N+1.
+    Payment.uncached { repeats.times { total += Payment.where("customer_id = 1").to_a.size } }
     envelope("redundant_sql", start, { repeats: repeats, queries_made: repeats, rows_seen: total })
   end
 

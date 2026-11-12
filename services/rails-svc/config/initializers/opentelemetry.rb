@@ -27,5 +27,11 @@ OpenTelemetry::SDK.configure do |c|
   # spans are dropped as MissingHttpUrl and the HTTP anti-patterns never fire.
   # ApplicationController#http_get emits its own CLIENT span with `url.full`
   # instead (one clean span, no dup).
-  c.use_all("OpenTelemetry::Instrumentation::Net::HTTP" => { enabled: false })
+  # PG keeps statement literals (lab data is synthetic): the default obfuscation
+  # turns redundant-sql's repeated `customer_id = 1` into `?`, which strict
+  # classification cannot tell from an N+1.
+  c.use_all(
+    "OpenTelemetry::Instrumentation::Net::HTTP" => { enabled: false },
+    "OpenTelemetry::Instrumentation::PG" => { db_statement: :include }
+  )
 end
