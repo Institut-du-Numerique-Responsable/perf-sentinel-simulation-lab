@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build, import, and helm-install the nest-svc multistack member.
-# NestJS 11 + Prisma 7.8 on Node.js 24 LTS.
+# NestJS 12 + Prisma 7.10 on Node.js 26 LTS.
 #
 # Usage: ./scripts/seed-nest-svc.sh
 set -euo pipefail

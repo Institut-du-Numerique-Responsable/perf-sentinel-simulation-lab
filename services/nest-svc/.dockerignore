@@ -6,3 +6,4 @@ dist/
 helm/
 Dockerfile
 .dockerignore
+src/generated/

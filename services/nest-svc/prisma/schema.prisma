@@ -1,11 +1,17 @@
+// Prisma 7: the URL lives in the driver adapter (src/prisma/prisma.service.ts),
+// no Rust engine and no binaryTargets. CommonJS output keeps the OTel
+// require-hooks (http, pg) working without an ESM loader.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
+  // Explicit: the inferred extension can be ".ts" (seen on Node 26), which breaks once compiled.
+  importFileExtension = "js"
 }
 
 model Order {

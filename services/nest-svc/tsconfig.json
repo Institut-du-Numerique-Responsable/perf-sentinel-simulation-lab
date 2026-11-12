@@ -1,6 +1,10 @@
 {
+  // shortcut: TypeScript stays on 6.0.x, TS 7 is the Go-native compiler and breaks
+  // the TS-API tooling (nest build, @nestjs/schematics peer ^6), upgrade once Nest supports 7.
+  // nodenext without "type": "module" emits CommonJS that loads the ESM-only Nest 12
+  // packages through require(esm), keeping the OTel require-hooks (http, pg) effective.
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "nodenext",
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,

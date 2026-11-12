@@ -1,16 +1,25 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../generated/prisma/client';
+
+// Prisma 7 talks to PostgreSQL through node-pg. The Prisma-only
+// `?schema=` param moves to the adapter option so generated SQL stays
+// qualified as "nest"."<table>", like the Prisma 6 engine emitted.
+function adapter(): PrismaPg {
+  const url = process.env.DATABASE_URL || '';
+  const schema = URL.canParse(url) ? new URL(url).searchParams.get('schema') : null;
+  return new PrismaPg(
+    { connectionString: url.replace(/[?&]schema=[^&]*/g, '') || undefined },
+    schema ? { schema } : undefined,
+  );
+}
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    super({
-      datasources: {
-        db: { url: process.env.DATABASE_URL },
-      },
-    });
+    super({ adapter: adapter() });
   }
 
   async onModuleInit() {
@@ -23,8 +32,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   private async ensureSchema() {
-    // Prisma 6 query engine uses prepared statements, which do not
-    // accept multiple commands per call. Split each DDL statement.
+    // Prisma runs each raw call as one prepared statement, which does
+    // not accept multiple commands. Split each DDL statement.
     await this.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS nest.orders (
         id BIGSERIAL PRIMARY KEY, customer VARCHAR(255) NOT NULL,
         status VARCHAR(32) NOT NULL DEFAULT 'PENDING',

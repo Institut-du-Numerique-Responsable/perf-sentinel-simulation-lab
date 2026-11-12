@@ -7,12 +7,12 @@
 // strict classifier consumes.
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { PgInstrumentation } from '@opentelemetry/instrumentation-pg';
 import { PrismaInstrumentation } from '@prisma/instrumentation';
 
-// Prisma's query engine defers span emission by a few seconds. The
+// Prisma 6's query engine deferred span emission by a few seconds. The
 // default BatchSpanProcessor scheduledDelayMillis (5000 ms) stacks
 // on top of that, pushing total latency past the lab's 15 s
 // validation flush window. Lowering to 1000 ms keeps the spans
@@ -20,13 +20,16 @@ import { PrismaInstrumentation } from '@prisma/instrumentation';
 // still amortises per-span export cost).
 const exporter = new OTLPTraceExporter();
 const sdk = new NodeSDK({
-  spanProcessors: [new BatchSpanProcessor(exporter, { scheduledDelayMillis: 1000 })],
+  spanProcessors: [new BatchSpanProcessor({ exporter, scheduledDelayMillis: 1000 })],
   instrumentations: [
     new HttpInstrumentation(),
     // PgInstrumentation instruments raw `pg` Pool queries (used by
     // the pool-saturation endpoint which bypasses Prisma to get true
     // concurrent connections). Without this, the pg Pool queries are
-    // invisible to the daemon's pool_saturation detector.
+    // invisible to the daemon's pool_saturation detector. Prisma 7 runs
+    // on node-pg too, so each prisma:client:db_query also gets a
+    // pg.query child: the daemon does not count it twice (same
+    // events_processed and findings as Prisma 6).
     new PgInstrumentation(),
     new PrismaInstrumentation(),
   ],

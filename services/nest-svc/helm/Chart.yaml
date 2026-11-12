@@ -1,6 +1,6 @@
 apiVersion: v2
 name: nest-svc
-description: NestJS 11 + Prisma 7.8 multistack member for perf-sentinel-simulation-lab
+description: NestJS 12 + Prisma 7.10 multistack member for perf-sentinel-simulation-lab
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
