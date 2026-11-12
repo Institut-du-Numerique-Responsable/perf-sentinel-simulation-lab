@@ -26,6 +26,10 @@ func New(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 	}
 	cfg.ConnConfig.Tracer = otelpgx.NewTracer(
 		otelpgx.WithIncludeQueryParameters(),
+		// otelpgx 0.13 defaults to bare "SELECT" span names; keep the
+		// pre-0.13 "query <full SQL>" names the lab findings were baselined on.
+		otelpgx.WithFullSQLInSpanName(),
+		otelpgx.WithQuerySpanNamePrefix(),
 	)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

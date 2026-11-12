@@ -1,4 +1,4 @@
-// go-svc: Go 1.26 multistack member for perf-sentinel-simulation-lab.
+// go-svc: Go 1.27 multistack member for perf-sentinel-simulation-lab.
 // chi router wrapped by otelhttp, pgx pool wrapped by otelpgx.
 //
 // Env overrides:

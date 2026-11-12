@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build, import, and helm-install the go-svc multistack member.
-# Go 1.26 + pgx v5 + chi + otelhttp + otelpgx.
+# Go 1.27 + pgx v5 + chi + otelhttp + otelpgx.
 #
 # Usage: ./scripts/seed-go-svc.sh
 set -euo pipefail
