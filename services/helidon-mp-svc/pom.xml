@@ -10,12 +10,12 @@
     <packaging>jar</packaging>
 
     <name>perf-sentinel helidon-mp-svc</name>
-    <description>Helidon MP 4.4.0 LTS stack member. Reproduces the 12 perf-sentinel anti-patterns via MicroProfile JAX-RS + CDI + JPA Hibernate.</description>
+    <description>Helidon MP 4.5.6 LTS stack member. Reproduces the 12 perf-sentinel anti-patterns via MicroProfile JAX-RS + CDI + JPA Hibernate.</description>
 
     <parent>
         <groupId>io.helidon.applications</groupId>
         <artifactId>helidon-mp</artifactId>
-        <version>4.4.0</version>
+        <version>4.5.6</version>
         <relativePath/>
     </parent>
 
@@ -24,7 +24,18 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <mainClass>io.helidon.microprofile.cdi.Main</mainClass>
-        <flyway.version>11.7.2</flyway.version>
+        <flyway.version>13.12.1</flyway.version>
+        <!-- Overrides of helidon-dependencies / helidon-applications managed
+             versions (both are ancestors, so the properties win). -->
+        <version.lib.postgresql>42.7.14</version.lib.postgresql>
+        <version.lib.junit>6.1.3</version.lib.junit>
+        <!-- 1.67, not 1.68: the API the OTel Java agent 2.33 bridges. -->
+        <version.lib.opentelemetry>1.67.0</version.lib.opentelemetry>
+        <version.plugin.compiler>3.16.0</version.plugin.compiler>
+        <version.plugin.resources>3.5.0</version.plugin.resources>
+        <version.plugin.surefire>3.6.1</version.plugin.surefire>
+        <version.plugin.dependency>3.11.0</version.plugin.dependency>
+        <version.plugin.jar>3.5.1</version.plugin.jar>
     </properties>
 
     <dependencies>
@@ -108,7 +119,7 @@
         <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
-            <version>5.27.1</version>
+            <version>5.37.1</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>
@@ -118,13 +129,12 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.12.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.test-framework.providers</groupId>
             <artifactId>jersey-test-framework-provider-inmemory</artifactId>
-            <version>3.1.11</version>
+            <version>${version.lib.jersey}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

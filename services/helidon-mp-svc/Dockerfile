@@ -1,7 +1,7 @@
 # Helidon MP multistage Dockerfile for helidon-mp-svc. Three stages,
 # aligned on the Spring Boot baseline `services/shared-dockerfile/Dockerfile`
 # and the quarkus-svc Dockerfile:
-#   1. Fetch + verify the OpenTelemetry Java agent v2.30. Helidon's
+#   1. Fetch + verify the OpenTelemetry Java agent v2.33. Helidon's
 #      built-in telemetry instruments JAX-RS, but the Java agent is
 #      what emits the `org.hibernate.*` scope marker that perf-sentinel's
 #      strict classifier needs for the n+1 SQL reclassification path.
@@ -14,8 +14,8 @@
 
 # ---- otel agent download ----
 FROM alpine:3.24 AS otel-agent
-ARG OTEL_AGENT_VERSION=2.30.0
-ARG OTEL_AGENT_SHA256=9d6bc2ad8dd8fb7f730984988e57b8ac0a82d81c7b3b8ae795378718733a509d
+ARG OTEL_AGENT_VERSION=2.33.1
+ARG OTEL_AGENT_SHA256=e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149
 RUN apk add --no-cache wget \
  && wget -q -O /opentelemetry-javaagent.jar \
     "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar" \
@@ -33,7 +33,7 @@ COPY src /build/src
 RUN mvn -B -ntp package -DskipTests
 
 # ---- runtime ----
-FROM gcr.io/distroless/java25:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot
 
 COPY --from=builder /build/target/helidon-mp-svc.jar /app/helidon-mp-svc.jar
 COPY --from=builder /build/target/libs/ /app/libs/
