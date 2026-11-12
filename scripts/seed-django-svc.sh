@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build, import, and helm-install the django-svc multistack member.
-# Django 5.2 LTS + psycopg 3.3 + gunicorn 26.
+# Django 5.2 LTS + psycopg 3.3 + gunicorn 27.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

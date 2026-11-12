@@ -1,13 +1,13 @@
 # django-svc multistage Dockerfile.
 #
-#   1. python:3.14-slim-bookworm builder: pip install + collectstatic.
+#   1. python:3.15-slim-trixie builder: pip install + collectstatic.
 #   2. Same slim image as runtime (distroless python3 lacks pip and
-#      psycopg binary deps — slim-bookworm is the pragmatic choice for
+#      psycopg binary deps — slim-trixie is the pragmatic choice for
 #      Django + psycopg[binary]).
 #
 # Build with:  docker build -t django-svc:s1 services/django-svc
 
-FROM python:3.15-slim-bookworm AS builder
+FROM python:3.15-slim-trixie AS builder
 WORKDIR /app
 
 COPY requirements.txt requirements.lock ./
@@ -16,7 +16,7 @@ RUN test "$(sha256sum requirements.txt | cut -d ' ' -f 1)" = "$(sed -n 's/^# req
 
 COPY djangosvc ./djangosvc
 
-FROM python:3.15-slim-bookworm
+FROM python:3.15-slim-trixie
 
 RUN useradd -r -u 65532 -d /app nonroot
 WORKDIR /app
