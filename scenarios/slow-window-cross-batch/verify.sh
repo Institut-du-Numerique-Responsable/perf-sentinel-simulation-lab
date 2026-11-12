@@ -111,6 +111,8 @@ listen_address = "$2"
 listen_port_http = $3
 listen_port_grpc = $4
 api_enabled = true
+# One socket per daemon: two host daemons on the default /tmp/perf-sentinel.sock fail to bind.
+json_socket = "${1%.toml}.sock"
 # Every trace closes before the next send, one trace per batch.
 trace_ttl_ms = 1000
 
