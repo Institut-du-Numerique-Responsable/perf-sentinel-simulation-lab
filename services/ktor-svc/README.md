@@ -1,6 +1,6 @@
 # ktor-svc
 
-Kotlin 2.4.10 and Ktor 3.5.1 member of the perf-sentinel multistack lab.
+Kotlin 2.4.21 and Ktor 3.6.1 member of the perf-sentinel multistack lab.
 It exposes the shared 12 fault endpoints, three business callbacks and two
 health endpoints on port 8097.
 
