@@ -1,6 +1,6 @@
 apiVersion: v2
 name: seaorm-svc
-description: Rust SeaORM 1.1 async multistack member for perf-sentinel-simulation-lab
+description: Rust SeaORM 2.0 async multistack member for perf-sentinel-simulation-lab
 type: application
 version: 1.0.0
 appVersion: "1.0.0"

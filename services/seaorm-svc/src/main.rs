@@ -1,4 +1,4 @@
-// seaorm-svc — Rust + SeaORM 1.1 async + axum + reqwest multistack member.
+// seaorm-svc — Rust + SeaORM 2.0 async + axum + reqwest multistack member.
 // SeaORM is async-native (sqlx under the hood), so no spawn_blocking needed.
 // OTel: same pattern as diesel-svc — reqwest-blocking-client pre-runtime,
 // axum-tracing-opentelemetry SERVER spans, manual CLIENT + SQL spans.
@@ -508,7 +508,7 @@ async fn db_query_scalar(db: &DatabaseConnection, sql: &str) -> i64 {
     let span = tracing::info_span!("db.query",
         db.system = "postgresql", db.statement = %sql, otel.kind = "CLIENT");
     let result = db
-        .query_one(Statement::from_string(DbBackend::Postgres, sql))
+        .query_one_raw(Statement::from_string(DbBackend::Postgres, sql))
         .instrument(span)
         .await;
     match result {
@@ -522,7 +522,7 @@ async fn db_query_scalar(db: &DatabaseConnection, sql: &str) -> i64 {
 async fn db_exec(db: &DatabaseConnection, sql: &str) -> bool {
     let span = tracing::info_span!("db.query",
         db.system = "postgresql", db.statement = %sql, otel.kind = "CLIENT");
-    db.execute(Statement::from_string(DbBackend::Postgres, sql))
+    db.execute_raw(Statement::from_string(DbBackend::Postgres, sql))
         .instrument(span)
         .await
         .is_ok()
@@ -653,7 +653,7 @@ async fn async_main(provider: SdkTracerProvider, tracer: opentelemetry_sdk::trac
 async fn bootstrap_schema(db: &DatabaseConnection) {
     // Advisory lock serialises concurrent replicas (same pattern as
     // django-svc / fastapi-svc).
-    db.execute(Statement::from_string(
+    db.execute_raw(Statement::from_string(
         DbBackend::Postgres,
         "SELECT pg_advisory_lock(808991)",
     ))
@@ -667,7 +667,7 @@ async fn bootstrap_schema(db: &DatabaseConnection) {
         "CREATE INDEX IF NOT EXISTS idx_seaorm_oi_oid ON seaorm.order_items(order_id)",
         "CREATE INDEX IF NOT EXISTS idx_seaorm_pay_cid ON seaorm.payments(customer_id)",
     ] {
-        db.execute(Statement::from_string(DbBackend::Postgres, ddl))
+        db.execute_raw(Statement::from_string(DbBackend::Postgres, ddl))
             .await
             .ok();
     }
@@ -675,7 +675,7 @@ async fn bootstrap_schema(db: &DatabaseConnection) {
     // Proper error propagation — don't swallow connection errors as
     // "not exists" which would cause duplicate seed inserts.
     let exists = match db
-        .query_one(Statement::from_string(
+        .query_one_raw(Statement::from_string(
             DbBackend::Postgres,
             "SELECT EXISTS(SELECT 1 FROM seaorm.orders LIMIT 1) AS exists",
         ))
@@ -685,7 +685,7 @@ async fn bootstrap_schema(db: &DatabaseConnection) {
         Ok(None) => false,
         Err(e) => {
             tracing::warn!("schema probe failed, skipping seed: {e}");
-            db.execute(Statement::from_string(
+            db.execute_raw(Statement::from_string(
                 DbBackend::Postgres,
                 "SELECT pg_advisory_unlock(808991)",
             ))
@@ -701,13 +701,13 @@ async fn bootstrap_schema(db: &DatabaseConnection) {
             "INSERT INTO seaorm.order_items (order_id, sku, quantity, price_cents) SELECT o.id, 'SKU-' || (o.id * 10 + g), (1 + (g % 5)), (100 + g * 50)::bigint FROM seaorm.orders o CROSS JOIN generate_series(1, 5) AS g WHERE o.id <= 100",
             "INSERT INTO seaorm.payments (order_id, customer_id, amount_cents, status) SELECT ((g-1) % 100)+1, ((g-1) % 50)+1, (g * 100)::bigint, 'AUTHORIZED' FROM generate_series(1, 200) AS g",
         ] {
-            db.execute(Statement::from_string(DbBackend::Postgres, seed))
+            db.execute_raw(Statement::from_string(DbBackend::Postgres, seed))
                 .await
                 .ok();
         }
     }
 
-    db.execute(Statement::from_string(
+    db.execute_raw(Statement::from_string(
         DbBackend::Postgres,
         "SELECT pg_advisory_unlock(808991)",
     ))
@@ -854,7 +854,7 @@ async fn health_live() -> Json<Value> {
     Json(json!({"status": "UP"}))
 }
 async fn health_ready(State(s): State<AppState>) -> Result<Json<Value>, StatusCode> {
-    s.db.execute(Statement::from_string(DbBackend::Postgres, "SELECT 1"))
+    s.db.execute_raw(Statement::from_string(DbBackend::Postgres, "SELECT 1"))
         .await
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
     Ok(Json(json!({"status": "UP"})))
@@ -893,7 +893,7 @@ async fn payments_history(
     );
     let span = tracing::info_span!("db.query", db.system = "postgresql", db.statement = %sql, otel.kind = "CLIENT");
     let rows =
-        s.db.query_all(Statement::from_string(DbBackend::Postgres, &sql))
+        s.db.query_all_raw(Statement::from_string(DbBackend::Postgres, &sql))
             .instrument(span)
             .await
             .unwrap_or_default();
