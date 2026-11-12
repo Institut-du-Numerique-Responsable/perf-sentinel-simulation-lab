@@ -11,7 +11,7 @@
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.1",
         "open-telemetry/exporter-otlp": "^1.5",
-        "open-telemetry/opentelemetry-auto-laravel": "1.9.0",
+        "open-telemetry/opentelemetry-auto-laravel": "^1.10",
         "open-telemetry/opentelemetry-auto-pdo": "^0.6",
         "open-telemetry/sdk": "^1.16",
         "php-amqplib/php-amqplib": "3.7.5",

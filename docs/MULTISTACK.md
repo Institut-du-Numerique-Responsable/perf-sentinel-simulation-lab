@@ -227,7 +227,7 @@ patch line are shown at the precision committed in the repository.
 | FastAPI (`fastapi-svc`) | Python 3.15; FastAPI 0.162.5; Pydantic 2.14.3 | SQLAlchemy 2.1.8; asyncpg 0.32.0; aio-pika 10.2.3; OTel SDK/exporter 1.45.2, instrumentations 0.66b2 |
 | Go / pgx (`go-svc`) | Go 1.27; chi 5.5.0; pgx 5.13.0 | amqp091-go 1.16.0; OTel Go 1.47.0; otelhttp 0.72.0; otelpgx 0.13.0 |
 | Rails (`rails-svc`) | Ruby 4.0; Rails/Active Record 8.1.4.1 | Bunny 3.6.0; pg 1.7.0; Puma 8.0.2; OTel SDK 1.13.1, OTLP 0.37.0, Rails 0.42.0, Active Record 0.13.0 |
-| Laravel (`laravel-svc`) | PHP 8.5; Laravel 13.42.0 | php-amqplib 3.7.5; OTel SDK 1.16.1, Laravel 1.9.0, PDO 0.6.0, PECL extension 1.5.0 |
+| Laravel (`laravel-svc`) | PHP 8.5; Laravel 13.42.0 | php-amqplib 3.7.5; OTel SDK 1.16.1, Laravel 1.10.0, PDO 0.6.0, PECL extension 1.5.0 |
 | Symfony (`symfony-svc`) | PHP 8.5; Symfony 7.4.23 LTS; Doctrine ORM 3.7.6 | php-amqplib 3.7.5; OTel SDK 1.16.1, Symfony 1.7.0, Doctrine 0.5.1/PDO 0.6.0, PECL extension 1.5.0 |
 
 ## Postgres conventions

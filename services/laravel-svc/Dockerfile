@@ -2,7 +2,7 @@
 #
 # The point of this service is the native OpenTelemetry PHP auto-instrumentation:
 # `opentelemetry-auto-laravel` tags the HTTP kernel + Eloquent spans with the
-# app-wide InstrumentationScope `io.opentelemetry.contrib.php.laravel`, and
+# `io.opentelemetry.contrib.php.laravel.*` InstrumentationScopes, and
 # `opentelemetry-auto-pdo` tags the SQL leaf with `io.opentelemetry.contrib.php.pdo`.
 # The daemon walks the leaf-to-root scope chain, sees the laravel scope, and maps
 # every finding in the request to suggested_fix.framework = php_laravel_eloquent.
@@ -45,11 +45,6 @@ WORKDIR /app
 # its metadata with the committed dependency graph. The framework selector is
 # intentionally still a range, and composer.lock makes the installed graph stable.
 RUN composer create-project laravel/laravel:^13.0 /app --no-scripts --prefer-dist --no-install
-# shortcut: opentelemetry-auto-laravel is pinned to exactly 1.9.0. 1.9.1+ drops
-# db.query.text from the Eloquent getModels span, so perf-sentinel then counts every
-# model load twice (laravel query span + PDO::prepare) and redundant-sql flips to
-# n_plus_one_sql; 1.10 also splits the scope into io.opentelemetry.contrib.php.laravel.*.
-# Upgrade once the daemon collapses those sibling SQL spans.
 COPY composer.json composer.lock /app/
 RUN composer validate --strict --no-check-all \
  && composer install --no-scripts --prefer-dist
