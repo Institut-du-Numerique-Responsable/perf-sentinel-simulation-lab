@@ -65,14 +65,14 @@ data:
         # Multistack: Rust (static binary per service)
         {"exe": "/usr/local/bin/diesel-svc-bin",               "cmdline": "diesel-svc-bin",                         "pid": 3240},
         {"exe": "/usr/local/bin/seaorm-svc-bin",               "cmdline": "seaorm-svc-bin",                         "pid": 3241},
-        # Multistack: Node (distroless nodejs24)
+        # Multistack: Node (distroless nodejs26)
         {"exe": "/usr/local/bin/node",                         "cmdline": "node/app/dist/main.js-nest-svc",         "pid": 4240},
         # Multistack: Python (distroless python3)
         {"exe": "/usr/bin/python3.13",                         "cmdline": "python3-mmanage.py-runserver-django-svc","pid": 5240},
         {"exe": "/usr/bin/python3.13",                         "cmdline": "python3-muvicorn-app.main:app-fastapi-svc","pid": 5241},
         # Multistack: Go (static binary)
         {"exe": "/usr/local/bin/go-svc-bin",                   "cmdline": "go-svc-bin",                             "pid": 6240},
-        # Multistack: Ruby (slim-bookworm, puma)
+        # Multistack: Ruby (slim-trixie, puma)
         {"exe": "/usr/local/bin/ruby",                         "cmdline": "rubypuma/app/config.ru-rails-svc",       "pid": 7240},
         # Multistack: PHP (cli built-in server; exe matches process_map bin/php)
         {"exe": "/usr/local/bin/php",                          "cmdline": "php-Sserver.php-laravel-svc",            "pid": 7241},

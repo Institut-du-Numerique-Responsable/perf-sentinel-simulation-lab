@@ -318,22 +318,22 @@ seed-quarkus-svc: ## Build + import + helm install the Quarkus multistack pilot
 seed-mutiny-svc: ## Build + import + helm install the Quarkus+Mutiny reactive multistack member
 	./scripts/seed-mutiny-svc.sh
 
-seed-helidon-mp-svc: ## Build + import + helm install the Helidon MP 4.4 multistack member
+seed-helidon-mp-svc: ## Build + import + helm install the Helidon MP 4.5 multistack member
 	./scripts/seed-helidon-mp-svc.sh
 
-seed-helidon-se-svc: ## Build + import + helm install the Helidon SE 4.4 multistack member
+seed-helidon-se-svc: ## Build + import + helm install the Helidon SE 4.5 multistack member
 	./scripts/seed-helidon-se-svc.sh
 
-seed-ktor-svc: ## Build + import + helm install the Kotlin 2.4 + Ktor 3.5 multistack member
+seed-ktor-svc: ## Build + import + helm install the Kotlin 2.4 + Ktor 3.6 multistack member
 	./scripts/seed-ktor-svc.sh
 
 seed-dotnet-svc: ## Build + import + helm install the .NET 10 LTS multistack member
 	./scripts/seed-dotnet-svc.sh
 
-seed-go-svc: ## Build + import + helm install the Go 1.26 multistack member
+seed-go-svc: ## Build + import + helm install the Go 1.27 multistack member
 	./scripts/seed-go-svc.sh
 
-seed-nest-svc: ## Build + import + helm install the NestJS 11 + Prisma multistack member
+seed-nest-svc: ## Build + import + helm install the NestJS 12 + Prisma multistack member
 	./scripts/seed-nest-svc.sh
 
 seed-django-svc: ## Build + import + helm install the Django 5.2 LTS multistack member
@@ -345,7 +345,7 @@ seed-fastapi-svc: ## Build + import + helm install the FastAPI + SQLAlchemy asyn
 seed-diesel-svc: ## Build + import + helm install the Rust + Diesel 2.x multistack member
 	./scripts/seed-diesel-svc.sh
 
-seed-seaorm-svc: ## Build + import + helm install the Rust + SeaORM 1.1 async multistack member
+seed-seaorm-svc: ## Build + import + helm install the Rust + SeaORM 2.0 async multistack member
 	./scripts/seed-seaorm-svc.sh
 
 seed-rails-svc: ## Build + import + helm install the Rails 8 + Active Record (Ruby 4.0) multistack member

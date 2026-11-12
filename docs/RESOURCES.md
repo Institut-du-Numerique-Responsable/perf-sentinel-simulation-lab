@@ -139,10 +139,10 @@ Allocate at least 12 GiB to Docker Desktop when chaining S1 + S2 + S3.
 | Grafana | 13.0.1 | explicit image override |
 | opentelemetry-collector (chart) | 0.158.0 | helm repo open-telemetry |
 | OTel Collector contrib (image) | 0.153.0 | bundled |
-| OTel Java agent | 2.27.0 | services/shared-dockerfile/Dockerfile |
-| Spring Boot starter parent | 4.0.6 | services/pom.xml (latest GA) |
-| eclipse-temurin (Java build) | 25-jdk-alpine | docker.io/library/eclipse-temurin |
-| distroless/java25 (runtime) | nonroot | gcr.io/distroless/java25 |
+| OTel Java agent | 2.33.1 | services/shared-dockerfile/Dockerfile |
+| Spring Boot starter parent | 4.1.2 | services/pom.xml (latest GA) |
+| eclipse-temurin (Java build) | 25.0.5_8-jdk-alpine | docker.io/library/eclipse-temurin |
+| distroless/java25-debian13 (runtime) | nonroot | gcr.io/distroless/java25-debian13 |
 | k6 | 1.7.1 | grafana/k6:1.7.1 |
 | GitLab CE chart | 9.11.2 | helm repo gitlab |
 | perf-sentinel | 0.5.16 | ghcr.io/institut-du-numerique-responsable/perf-sentinel |

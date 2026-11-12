@@ -174,24 +174,24 @@ Postgres schema in the shared `lab` database.
 
 | Service              | Port | Schema        | Effective stack                                      |
 |----------------------|------|---------------|------------------------------------------------------|
-| order-service        | 8080 | orders        | Spring Boot 4.0.6 + JPA                             |
-| payment-service      | 8081 | payments      | Spring Boot 4.0.6 + JPA                             |
-| notification-service | 8082 | notifications | Spring Boot 4.0.6 + JPA                             |
-| quarkus-svc          | 8083 | quarkus       | Quarkus 3.33.1.1 LTS + Panache                      |
-| mutiny-svc           | 8084 | mutiny        | Quarkus 3.33.1.1 LTS + Mutiny                       |
-| helidon-se-svc       | 8085 | helidon_se    | Helidon SE 4.4.0                                    |
-| helidon-mp-svc       | 8086 | helidon_mp    | Helidon MP 4.4.0 + JPA                              |
-| dotnet-svc           | 8087 | dotnet        | .NET 10 + EF Core 10.0.10                           |
-| diesel-svc           | 8088 | diesel        | Rust 1.97 + Diesel 2.3.12                           |
-| seaorm-svc           | 8089 | seaorm        | Rust 1.97 + SeaORM 1.1.20                           |
-| nest-svc             | 8090 | nest          | NestJS 11.1.28 + Prisma 6.19.3                      |
-| django-svc           | 8091 | django        | Django 5.2.17 LTS + psycopg 3.3.4                   |
-| fastapi-svc          | 8092 | fastapi       | FastAPI 0.141.1 + SQLAlchemy 2.0.51 async           |
-| go-svc               | 8093 | go            | Go 1.26 + pgx 5.10.0                                |
-| rails-svc            | 8094 | rails         | Rails 8.1.3.1 + Active Record (Ruby 4.0)            |
-| laravel-svc          | 8095 | laravel       | Laravel 13.25.0 + Eloquent (PHP 8.5, native OTel)   |
-| symfony-svc          | 8096 | symfony       | Symfony 7.4.16 LTS + Doctrine 3.6.8 (PHP 8.5)       |
-| ktor-svc             | 8097 | ktor          | Ktor 3.5.1 + Kotlin 2.4.10                          |
+| order-service        | 8080 | orders        | Spring Boot 4.1.2 + JPA                             |
+| payment-service      | 8081 | payments      | Spring Boot 4.1.2 + JPA                             |
+| notification-service | 8082 | notifications | Spring Boot 4.1.2 + JPA                             |
+| quarkus-svc          | 8083 | quarkus       | Quarkus 3.40.1.2 LTS + Panache                      |
+| mutiny-svc           | 8084 | mutiny        | Quarkus 3.40.1.2 LTS + Mutiny                       |
+| helidon-se-svc       | 8085 | helidon_se    | Helidon SE 4.5.6                                    |
+| helidon-mp-svc       | 8086 | helidon_mp    | Helidon MP 4.5.6 + JPA                              |
+| dotnet-svc           | 8087 | dotnet        | .NET 10 + EF Core 10.0.15                           |
+| diesel-svc           | 8088 | diesel        | Rust 1.99 + Diesel 2.3.14                           |
+| seaorm-svc           | 8089 | seaorm        | Rust 1.99 + SeaORM 2.0.4                            |
+| nest-svc             | 8090 | nest          | NestJS 12.4.2 + Prisma 7.10.1                       |
+| django-svc           | 8091 | django        | Django 5.2.19 LTS + psycopg 3.3.8                   |
+| fastapi-svc          | 8092 | fastapi       | FastAPI 0.162.5 + SQLAlchemy 2.1.8 async            |
+| go-svc               | 8093 | go            | Go 1.27 + pgx 5.13.0                                |
+| rails-svc            | 8094 | rails         | Rails 8.1.4.1 + Active Record (Ruby 4.0)            |
+| laravel-svc          | 8095 | laravel       | Laravel 13.42.0 + Eloquent (PHP 8.5, native OTel)   |
+| symfony-svc          | 8096 | symfony       | Symfony 7.4.23 LTS + Doctrine 3.7.6 (PHP 8.5)       |
+| ktor-svc             | 8097 | ktor          | Ktor 3.6.1 + Kotlin 2.4.21                          |
 
 The two PHP members exercise perf-sentinel's framework-aware
 `suggested_fix`. Laravel's app-wide
@@ -204,7 +204,7 @@ The two PHP members exercise perf-sentinel's framework-aware
 Cluster-internal DNS:
 `http://<svc-name>.shop.svc.cluster.local:<port>`.
 
-### Effective versions (verified 2026-08-09)
+### Effective versions (verified 2026-11-12)
 
 This is an inventory of the versions resolved by the committed manifests,
 lockfiles, and Dockerfiles. It does not claim that they are the latest or
@@ -213,22 +213,22 @@ patch line are shown at the precision committed in the repository.
 
 | Stack (services) | Effective framework and runtime | Effective data, messaging, and telemetry dependencies |
 |------------------|---------------------------------|-------------------------------------------------------|
-| Spring Boot / JPA (`order-service`, `payment-service`, `notification-service`) | Spring Boot 4.0.6; Java 25 / Temurin 25.0.3_9; Hibernate 7.2.12.Final | PostgreSQL JDBC 42.7.4; Flyway 11.0.0; RabbitMQ Java 5.27.1; OTel Java agent 2.30.0 |
-| Quarkus Panache (`quarkus-svc`) | Quarkus 3.33.1.1 LTS; Java 25 / Temurin 25.0.3_9; Hibernate 7.2.6.Final | PostgreSQL JDBC 42.7.10; RabbitMQ Java 5.27.1; Quarkus OTel extension + OTel Java agent 2.30.0 |
-| Quarkus Mutiny (`mutiny-svc`) | Quarkus 3.33.1.1 LTS; Mutiny 3.2.0; Java 25 / Temurin 25.0.3_9 | Vert.x PG client 4.5.26; RabbitMQ Java 5.27.1; native Quarkus OTel extension |
-| Helidon SE (`helidon-se-svc`) | Helidon SE 4.4.0; Java 25 / Temurin 25.0.3_9 | HikariCP 6.0.0; Flyway 11.7.2; PostgreSQL JDBC 42.7.2; RabbitMQ Java 5.27.1; OTel Java agent 2.30.0 |
-| Helidon MP (`helidon-mp-svc`) | Helidon MP 4.4.0 / MicroProfile 6.1; Java 25 / Temurin 25.0.3_9 | Hibernate 6.3.1.Final; HikariCP 5.0.1; Flyway 11.7.2; PostgreSQL JDBC 42.7.2; RabbitMQ Java 5.27.1; OTel Java agent 2.30.0 |
-| Kotlin / Ktor (`ktor-svc`) | Kotlin 2.4.10; Ktor 3.5.1; Java 25 / Temurin 25.0.3_9 | Exposed 2.0.18; HikariCP 6.0.0; PostgreSQL JDBC 42.7.4; Flyway 11.7.2; RabbitMQ Java 5.27.1; OTel API 1.51.0 + Java agent 2.30.0 |
-| .NET / EF Core (`dotnet-svc`) | .NET 10 (`net10.0`); EF Core 10.0.10 | Npgsql EF 10.0.3; RabbitMQ.Client 7.2.2; OTel stable packages 1.17.0, EF instrumentation 1.15.1-beta.1 |
-| Rust / Diesel (`diesel-svc`) | Rust 1.97; axum 0.8.9; Diesel 2.3.12 | Lapin 4.10.0; OTel Rust 0.32.0; tracing-opentelemetry 0.33.0; axum-tracing-opentelemetry 0.38.0 |
-| Rust / SeaORM (`seaorm-svc`) | Rust 1.97; axum 0.8.9; SeaORM 1.1.20 | Lapin 4.10.0; OTel Rust 0.32.0; tracing-opentelemetry 0.33.0; axum-tracing-opentelemetry 0.38.0 |
-| NestJS / Node (`nest-svc`) | Node.js 24; NestJS 11.1.28; Prisma/client 6.19.3 | amqplib 2.0.1; pg 8.21.0; OTel sdk-node/HTTP/OTLP 0.221.0, trace-node 2.10.0, pg instrumentation 0.73.0 |
-| Django (`django-svc`) | Python 3.14; Django 5.2.17 LTS | psycopg 3.3.4; Pika 1.3.2; OTel SDK/exporter 1.44.0, instrumentations 0.65b0 |
-| FastAPI (`fastapi-svc`) | Python 3.14; FastAPI 0.141.1; Pydantic 2.13.4 | SQLAlchemy 2.0.51; asyncpg 0.31.0; aio-pika 9.6.2; OTel SDK/exporter 1.44.0, instrumentations 0.65b0 |
-| Go / pgx (`go-svc`) | Go 1.26; chi 5.3.1; pgx 5.10.0 | amqp091-go 1.13.0; OTel Go 1.45.0; otelhttp 0.70.0; otelpgx 0.11.1 |
-| Rails (`rails-svc`) | Ruby 4.0; Rails/Active Record 8.1.3.1 | Bunny 3.1.0; pg 1.6.3; Puma 8.0.2; OTel SDK 1.13.0, OTLP 0.34.1, Rails 0.42.0, Active Record 0.13.0 |
-| Laravel (`laravel-svc`) | PHP 8.5; Laravel 13.25.0 | php-amqplib 3.7.4; OTel SDK 1.15.0, Laravel 1.8.0, PDO 0.5.0, PECL extension 1.2.1 |
-| Symfony (`symfony-svc`) | PHP 8.5; Symfony 7.4.16 LTS; Doctrine ORM 3.6.8 | php-amqplib 3.7.4; OTel SDK 1.15.0, Symfony 1.4.0, Doctrine/PDO 0.5.0, PECL extension 1.2.1 |
+| Spring Boot / JPA (`order-service`, `payment-service`, `notification-service`) | Spring Boot 4.1.2; Java 25 / Temurin 25.0.5_8; Hibernate 7.4.13.Final | PostgreSQL JDBC 42.7.14; Flyway 13.12.1; RabbitMQ Java 5.37.1; OTel Java agent 2.33.1 |
+| Quarkus Panache (`quarkus-svc`) | Quarkus 3.40.1.2 LTS; Java 25 / Temurin 25.0.5_8; Hibernate 7.4.9.Final | PostgreSQL JDBC 42.7.13; RabbitMQ Java 5.37.1; Quarkus OTel extension + OTel Java agent 2.33.1 |
+| Quarkus Mutiny (`mutiny-svc`) | Quarkus 3.40.1.2 LTS; Mutiny 3.3.0; Java 25 / Temurin 25.0.5_8 | Vert.x PG client 4.5.35; RabbitMQ Java 5.37.1; native Quarkus OTel extension |
+| Helidon SE (`helidon-se-svc`) | Helidon SE 4.5.6; Java 25 / Temurin 25.0.5_8 | HikariCP 7.1.0; Flyway 13.12.1; PostgreSQL JDBC 42.7.14; RabbitMQ Java 5.37.1; OTel Java agent 2.33.1 |
+| Helidon MP (`helidon-mp-svc`) | Helidon MP 4.5.6 / MicroProfile 6.1; Java 25 / Temurin 25.0.5_8 | Hibernate 6.3.1.Final; HikariCP 5.0.1; Flyway 13.12.1; PostgreSQL JDBC 42.7.14; RabbitMQ Java 5.37.1; OTel Java agent 2.33.1 |
+| Kotlin / Ktor (`ktor-svc`) | Kotlin 2.4.21; Ktor 3.6.1; Java 25 / Temurin 25.0.5_8 | slf4j-simple 2.0.20; HikariCP 7.1.0; PostgreSQL JDBC 42.7.14; Flyway 13.12.1; RabbitMQ Java 5.37.1; OTel API 1.67.0 + Java agent 2.33.1 |
+| .NET / EF Core (`dotnet-svc`) | .NET 10 (`net10.0`); EF Core 10.0.15 | Npgsql EF 10.0.3; RabbitMQ.Client 7.2.2; OTel stable packages 1.21.0, EF instrumentation 1.21.0-beta.1 |
+| Rust / Diesel (`diesel-svc`) | Rust 1.99; axum 0.8.9; Diesel 2.3.14 | Lapin 4.12.3; OTel Rust 0.32.0; tracing-opentelemetry 0.33.0; axum-tracing-opentelemetry 0.39.1 |
+| Rust / SeaORM (`seaorm-svc`) | Rust 1.99; axum 0.8.9; SeaORM 2.0.4 | Lapin 4.12.3; OTel Rust 0.32.0; tracing-opentelemetry 0.33.0; axum-tracing-opentelemetry 0.39.1 |
+| NestJS / Node (`nest-svc`) | Node.js 26; NestJS 12.4.2; Prisma/client 7.10.1 (adapter-pg) | amqplib 2.3.1; pg 8.23.1; OTel sdk-node/HTTP/OTLP 0.301.1, sdk-trace 3.1.1, pg instrumentation 0.78.0 |
+| Django (`django-svc`) | Python 3.15; Django 5.2.19 LTS | psycopg 3.3.8; Pika 1.4.4; OTel SDK/exporter 1.45.2, instrumentations 0.66b2 |
+| FastAPI (`fastapi-svc`) | Python 3.15; FastAPI 0.162.5; Pydantic 2.14.3 | SQLAlchemy 2.1.8; asyncpg 0.32.0; aio-pika 10.2.3; OTel SDK/exporter 1.45.2, instrumentations 0.66b2 |
+| Go / pgx (`go-svc`) | Go 1.27; chi 5.5.0; pgx 5.13.0 | amqp091-go 1.16.0; OTel Go 1.47.0; otelhttp 0.72.0; otelpgx 0.13.0 |
+| Rails (`rails-svc`) | Ruby 4.0; Rails/Active Record 8.1.4.1 | Bunny 3.6.0; pg 1.7.0; Puma 8.0.2; OTel SDK 1.13.1, OTLP 0.37.0, Rails 0.42.0, Active Record 0.13.0 |
+| Laravel (`laravel-svc`) | PHP 8.5; Laravel 13.42.0 | php-amqplib 3.7.5; OTel SDK 1.16.1, Laravel 1.9.0, PDO 0.6.0, PECL extension 1.5.0 |
+| Symfony (`symfony-svc`) | PHP 8.5; Symfony 7.4.23 LTS; Doctrine ORM 3.7.6 | php-amqplib 3.7.5; OTel SDK 1.16.1, Symfony 1.7.0, Doctrine 0.5.1/PDO 0.6.0, PECL extension 1.5.0 |
 
 ## Postgres conventions
 
@@ -278,17 +278,17 @@ OTEL_RESOURCE_ATTRIBUTES=service.namespace=shop,deployment.environment=lab,cloud
 
 Stack-specific instrumentation choice:
 
-- **Spring Boot baseline**: OTel Java agent 2.30.0.
-- **Quarkus Panache**: `quarkus-opentelemetry` plus OTel Java agent 2.30.0.
+- **Spring Boot baseline**: OTel Java agent 2.33.1.
+- **Quarkus Panache**: `quarkus-opentelemetry` plus OTel Java agent 2.33.1.
 - **Quarkus Mutiny**: native `quarkus-opentelemetry`, without the Java agent.
-- **Helidon SE / MP** and **Ktor**: OTel Java agent 2.30.0.
+- **Helidon SE / MP** and **Ktor**: OTel Java agent 2.33.1.
 - **.NET 10**: `OpenTelemetry.AspNetCore` + `OpenTelemetry.Instrumentation.EntityFrameworkCore`
   + `OpenTelemetry.Exporter.OpenTelemetryProtocol`, configured in `Program.cs`
   via the `ResourceBuilder` and `TracerProviderBuilder` chain.
 - **Rust** (Diesel / SeaORM): `opentelemetry` 0.32 +
   `tracing-opentelemetry` 0.33 + `opentelemetry-otlp`, initialised at
-  startup. The HTTP layer uses `axum-tracing-opentelemetry` 0.38.
-- **NestJS**: `@opentelemetry/sdk-node` 0.221 configured at `main.ts` boot.
+  startup. The HTTP layer uses `axum-tracing-opentelemetry` 0.39.
+- **NestJS**: `@opentelemetry/sdk-node` 0.301 (SDK 3.x) configured at `main.ts` boot.
 - **Django / FastAPI**: `opentelemetry-instrumentation-django` /
   `opentelemetry-instrumentation-fastapi` + `opentelemetry-instrumentation-psycopg`
   / `opentelemetry-instrumentation-sqlalchemy`.
@@ -368,11 +368,12 @@ Key points for the phase 3 (Helidon MP) and phase 4 (Helidon SE) deliveries:
 - **LTS confirmed**: Helidon 4.4 is now an LTS release covered by Oracle's
   Java Verified Portfolio (JVP). The lab pins 4.4.0 with confidence.
 - **Tip and Tail model**: future Helidon releases adopt OpenJDK's
-  Tip-and-Tail. Helidon 4.4 is the Tail (LTS), and the next major
-  (Helidon 27) will track JDK 27 with the Tip cadence. Bumping the lab
-  past 4.4 is a deliberate Sept-2026+ decision, not a routine patch.
+  Tip-and-Tail. The 4.x line is the Tail (LTS), and Helidon 27
+  (2026-10) tracks JDK 27 with the Tip cadence and reworks the
+  programming models (MP has no 27 artifact). The lab moved to the
+  4.5.x Tail (4.5.6, 2026-11) and does not follow the Tip.
 - **Java 21 minimum, Java 25 recommended**: Helidon 4.4 runs on the same
-  `gcr.io/distroless/java25-debian12` image the Java baseline uses.
+  `gcr.io/distroless/java25-debian13` image the Java baseline uses.
 - **OpenTelemetry exporter**: the upstream OTel release Helidon 4.4 ships
   with no longer includes the Jaeger exporter. Helidon's Jaeger tracing
   provider is deprecated. **Lab choice**: stick with OTLP HTTP/protobuf

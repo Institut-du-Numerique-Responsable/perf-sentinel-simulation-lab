@@ -245,9 +245,9 @@ Each service ships:
 
 - A multistage container image built from
   `services/shared-dockerfile/Dockerfile`. Build stage runs Maven on
-  `eclipse-temurin:25-jdk-alpine`. Runtime stage is
-  `gcr.io/distroless/java25:nonroot`. The OpenTelemetry Java agent
-  v2.27.0 is downloaded in a dedicated stage and copied into
+  `eclipse-temurin:25.0.5_8-jdk-alpine`. Runtime stage is
+  `gcr.io/distroless/java25-debian13:nonroot`. The OpenTelemetry Java agent
+  v2.33.1 is downloaded in a dedicated stage and copied into
   `/otel/opentelemetry-javaagent.jar`. `JAVA_TOOL_OPTIONS` activates
   the agent at JVM startup.
 - A Helm chart in `services/<svc>/helm/`. Values cover image tag,
