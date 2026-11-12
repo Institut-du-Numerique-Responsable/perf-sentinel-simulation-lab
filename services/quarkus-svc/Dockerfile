@@ -1,6 +1,6 @@
 # Quarkus multistage Dockerfile for quarkus-svc. Three stages, aligned
 # on the Spring Boot baseline `services/shared-dockerfile/Dockerfile`:
-#   1. Fetch the OpenTelemetry Java agent v2.30. Required because the
+#   1. Fetch the OpenTelemetry Java agent v2.33. Required because the
 #      `quarkus-opentelemetry` extension instruments JDBC but does NOT
 #      emit the `org.hibernate.*` scope marker that perf-sentinel's
 #      strict sanitizer-aware classifier needs to reclassify a
@@ -16,10 +16,10 @@
 
 # ---- otel agent download ----
 FROM alpine:3.24 AS otel-agent
-ARG OTEL_AGENT_VERSION=2.30.0
-# SHA-256 published for the v2.30.0 release asset and verified against
+ARG OTEL_AGENT_VERSION=2.33.1
+# SHA-256 published for the v2.33.1 release asset and verified against
 # the downloaded JAR. Fails the build if the upstream asset changes.
-ARG OTEL_AGENT_SHA256=9d6bc2ad8dd8fb7f730984988e57b8ac0a82d81c7b3b8ae795378718733a509d
+ARG OTEL_AGENT_SHA256=e43a270df53c6f423e0ab157be9c27ccc01d5dc3232e162fe54777573db2f149
 RUN apk add --no-cache wget \
  && wget -q -O /opentelemetry-javaagent.jar \
     "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar" \
@@ -38,7 +38,7 @@ COPY src /build/src
 RUN mvn -B -ntp package -DskipTests -Dquarkus.package.jar.type=fast-jar
 
 # ---- runtime ----
-FROM gcr.io/distroless/java25:nonroot
+FROM gcr.io/distroless/java25-debian13:nonroot
 
 # quarkus-fast-jar layout: target/quarkus-app/{quarkus-run.jar,lib,quarkus,app}
 COPY --from=builder /build/target/quarkus-app/ /app/

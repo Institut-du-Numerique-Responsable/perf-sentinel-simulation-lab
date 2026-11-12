@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>perf-sentinel quarkus-svc</name>
-    <description>Quarkus stack member of the multistack lab. Reproduces the 10 perf-sentinel anti-patterns on Quarkus 3.33 LTS + Panache + Agroal + quarkus-opentelemetry.</description>
+    <description>Quarkus stack member of the multistack lab. Reproduces the 10 perf-sentinel anti-patterns on Quarkus 3.40 LTS + Panache + Agroal + quarkus-opentelemetry.</description>
 
     <!-- Standalone POM (not a child of services/pom.xml). The Spring Boot parent
          and Quarkus BOM cannot coexist; isolating Quarkus services lets each
@@ -22,9 +22,9 @@
         <maven.compiler.target>25</maven.compiler.target>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.version>3.33.1.1</quarkus.platform.version>
-        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
-        <surefire-plugin.version>3.5.0</surefire-plugin.version>
+        <quarkus.platform.version>3.40.1.2</quarkus.platform.version>
+        <maven.compiler.plugin.version>3.16.0</maven.compiler.plugin.version>
+        <surefire-plugin.version>3.6.1</surefire-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -92,7 +92,7 @@
         <dependency>
             <groupId>com.rabbitmq</groupId>
             <artifactId>amqp-client</artifactId>
-            <version>5.27.1</version>
+            <version>5.37.1</version>
         </dependency>
 
         <!-- Health endpoints (SmallRye Health, exposes /q/health/live and /q/health/ready) -->
@@ -110,7 +110,7 @@
         <!-- Tests (kept minimal: this lab service is validated end-to-end via k6, not by unit tests) -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
+            <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -120,7 +120,7 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5-mockito</artifactId>
+            <artifactId>quarkus-junit-mockito</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
