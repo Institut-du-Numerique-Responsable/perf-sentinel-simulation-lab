@@ -10,7 +10,7 @@
 # Single-stage (ponytail): the opentelemetry PECL extension must be present at
 # runtime, and rebuilding it in a second stage buys only image size, which does
 # not matter for a lab member. Build with: docker build -t laravel-svc:s1 services/laravel-svc
-FROM php:8.5-cli-bookworm
+FROM php:8.5-cli-trixie
 
 # Build + runtime libs: git/unzip for composer, libpq for pdo_pgsql, PHPIZE deps
 # for the opentelemetry PECL extension.
@@ -18,7 +18,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       git unzip libpq-dev $PHPIZE_DEPS \
  && docker-php-ext-install -j"$(nproc)" pdo_pgsql sockets \
- && pecl install opentelemetry-1.2.1 \
+ && pecl install opentelemetry-1.5.0 \
  && docker-php-ext-enable opentelemetry \
  && apt-get purge -y --auto-remove $PHPIZE_DEPS \
  && rm -rf /var/lib/apt/lists/*
@@ -45,6 +45,11 @@ WORKDIR /app
 # its metadata with the committed dependency graph. The framework selector is
 # intentionally still a range, and composer.lock makes the installed graph stable.
 RUN composer create-project laravel/laravel:^13.0 /app --no-scripts --prefer-dist --no-install
+# shortcut: opentelemetry-auto-laravel is pinned to exactly 1.9.0. 1.9.1+ drops
+# db.query.text from the Eloquent getModels span, so perf-sentinel then counts every
+# model load twice (laravel query span + PDO::prepare) and redundant-sql flips to
+# n_plus_one_sql; 1.10 also splits the scope into io.opentelemetry.contrib.php.laravel.*.
+# Upgrade once the daemon collapses those sibling SQL spans.
 COPY composer.json composer.lock /app/
 RUN composer validate --strict --no-check-all \
  && composer install --no-scripts --prefer-dist
