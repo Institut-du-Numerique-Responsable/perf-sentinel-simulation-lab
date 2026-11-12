@@ -24,7 +24,7 @@ docker run --rm \
     --volume "${REPO_ROOT}/${SERVICE_DIR}:/service:ro" \
     --volume "${TMP}:/out" \
     --workdir /service \
-    python:3.14-slim-bookworm@sha256:23c59390fc717bf09f9336908199a0ae75d9c4264bf296123f94ad772fea3b52 \
+    python:3.15-slim-trixie@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 \
     sh -ec '
         python -m pip install --disable-pip-version-check --no-cache-dir --quiet pip==25.3 pip-tools==7.6.0 >/dev/null 2>&1
         python -m piptools compile --generate-hashes --strip-extras --no-header \
