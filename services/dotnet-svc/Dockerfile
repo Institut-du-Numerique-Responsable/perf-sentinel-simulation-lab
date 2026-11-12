@@ -12,7 +12,7 @@
 # Build with:  docker build -t dotnet-svc:s1 services/dotnet-svc
 
 # ---- builder ----
-FROM mcr.microsoft.com/dotnet/sdk:11.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0-resolute AS builder
 WORKDIR /src
 
 # Restore first for layer cache. Copy the project and lock file so the
@@ -30,7 +30,7 @@ RUN dotnet publish DotnetSvc.csproj \
         -o /app/publish
 
 # ---- runtime ----
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-resolute-chiseled-extra AS runtime
 
 WORKDIR /app
 COPY --from=builder /app/publish /app
