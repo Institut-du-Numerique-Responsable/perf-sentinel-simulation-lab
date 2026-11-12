@@ -57,7 +57,7 @@ kubectl -n db wait --for=condition=Complete job/postgres-multistack-schemas --ti
 ok "Ktor schema and role ready"
 
 step "Helm upgrade --install ${SVC}"
-helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" \
+deploy_rebuilt shop "${SVC}" helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" \
   -n shop --set-file "database.password=${PASSWORD_FILE}" --wait --timeout 5m >/dev/null
 ok "${SVC} deployed"
 

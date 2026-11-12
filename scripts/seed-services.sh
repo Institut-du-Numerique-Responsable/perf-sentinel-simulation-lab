@@ -69,7 +69,7 @@ step "Helm upgrade --install for the 3 charts"
 for svc in "${SERVICES[@]}"; do
   # --set-file reads the password from disk so it never appears in argv
   # (visible to ps aux) or shell history.
-  helm upgrade --install "${svc}" "${REPO_ROOT}/services/${svc}/helm/" \
+  deploy_rebuilt shop "${svc}" helm upgrade --install "${svc}" "${REPO_ROOT}/services/${svc}/helm/" \
     -n shop \
     --set-file "database.password=${PASSWORD_FILE}" \
     --wait --timeout 5m >/dev/null

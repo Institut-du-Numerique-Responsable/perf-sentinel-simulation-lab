@@ -66,3 +66,18 @@ reclaim_local_docker_image() {
   [ -n "${image}" ] || return 0
   docker image rm "${image}" >/dev/null 2>&1 || true
 }
+
+# deploy_rebuilt <namespace> <deployment> <helm command...>
+#
+# Runs the helm command, then restarts <deployment> if it already existed.
+# Seed tags are fixed (svc:sN), so upgrading onto a rebuilt image changes no
+# pod spec field and the old pod would keep serving the previous build.
+deploy_rebuilt() {
+  local ns="$1" deploy="$2" existed=""
+  shift 2
+  kubectl -n "${ns}" get deployment "${deploy}" >/dev/null 2>&1 && existed=1
+  "$@" || return
+  [ -z "${existed}" ] && return 0
+  kubectl -n "${ns}" rollout restart deployment "${deploy}" >/dev/null &&
+    kubectl -n "${ns}" rollout status deployment "${deploy}" --timeout=300s >/dev/null
+}

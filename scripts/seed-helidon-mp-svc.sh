@@ -61,7 +61,7 @@ for attempt in 1 2; do
 done
 
 step "Helm upgrade --install ${SVC}"
-helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" \
+deploy_rebuilt shop "${SVC}" helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" \
   -n shop \
   --set-file "database.password=${PASSWORD_FILE}" \
   --wait --timeout 5m >/dev/null

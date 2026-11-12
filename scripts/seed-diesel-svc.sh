@@ -33,7 +33,7 @@ for attempt in 1 2; do
   else die "k3d image import unreliable"; fi
 done
 step "Helm upgrade --install ${SVC}"
-helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" -n shop \
+deploy_rebuilt shop "${SVC}" helm upgrade --install "${SVC}" "${REPO_ROOT}/services/${SVC}/helm/" -n shop \
   --set-file "database.password=${PASSWORD_FILE}" --wait --timeout 5m >/dev/null
 ok "${SVC} deployed"
 step "Waiting for shop deployment ${SVC}"
