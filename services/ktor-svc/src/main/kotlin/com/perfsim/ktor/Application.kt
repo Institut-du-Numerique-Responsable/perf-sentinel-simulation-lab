@@ -20,9 +20,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import io.opentelemetry.api.GlobalOpenTelemetry
-import io.opentelemetry.api.trace.SpanKind
-import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -38,7 +35,6 @@ import kotlin.math.min
 
 private const val SERVICE = "ktor-svc"
 private val channels = listOf("email", "sms", "push", "webhook", "slack", "teams")
-private val dbTracer = GlobalOpenTelemetry.getTracer("com.perfsim.ktor.database")
 
 fun main() {
     embeddedServer(
@@ -104,12 +100,10 @@ fun Application.module(testing: Boolean = false, messagingPublisher: MessagingPu
                     requireNotNull(dataSource).connection.use { connection ->
                         (1..items).sumOf { orderId ->
                             val sql = "SELECT count(*) FROM ktor.order_items WHERE order_id = $orderId"
-                            databaseSpan(sql) {
-                                connection.createStatement().use { statement ->
-                                    statement.executeQuery(sql).use { result ->
-                                        result.next()
-                                        result.getInt(1)
-                                    }
+                            connection.createStatement().use { statement ->
+                                statement.executeQuery(sql).use { result ->
+                                    result.next()
+                                    result.getInt(1)
                                 }
                             }
                         }
@@ -383,24 +377,6 @@ private class V1__init : BaseJavaMigration() {
                 """.trimIndent(),
             )
         }
-    }
-}
-
-private fun <T> databaseSpan(statement: String, body: () -> T): T {
-    val span = dbTracer.spanBuilder("SELECT ktor.order_items")
-        .setSpanKind(SpanKind.CLIENT)
-        .setAttribute("db.system", "postgresql")
-        .setAttribute("db.statement", statement)
-        .setAttribute("db.operation", "SELECT")
-        .startSpan()
-    return try {
-        span.makeCurrent().use { body() }
-    } catch (error: Exception) {
-        span.recordException(error)
-        span.setStatus(StatusCode.ERROR)
-        throw error
-    } finally {
-        span.end()
     }
 }
 
