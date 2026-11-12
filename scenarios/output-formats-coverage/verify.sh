@@ -38,7 +38,7 @@
 #   6.F. The text `Window:` line is in the local time zone (0.23.0), nine
 #        hours later under TZ=JST-9 and TZ=Asia/Tokyo than under UTC, the
 #        named zone resolving with no zoneinfo in the image, and the JSON
-#        output is byte-identical between zones.
+#        output is identical between zones (wall-clock duration_ms aside).
 
 set -euo pipefail
 
@@ -375,6 +375,7 @@ tz_run JST-9 text "${TMP_DIR}/tz-jst.txt"
 tz_run Asia/Tokyo text "${TMP_DIR}/tz-named.txt"
 tz_run UTC json "${TMP_DIR}/tz-utc.json"
 tz_run JST-9 json "${TMP_DIR}/tz-jst.json"
+# analysis.duration_ms is wall-clock (0 or 1 ms on this fixture), so it is left out of the comparison.
 UTC_WINDOW="$(window_line "${TMP_DIR}/tz-utc.txt")"
 JST_WINDOW="$(window_line "${TMP_DIR}/tz-jst.txt")"
 NAMED_WINDOW="$(window_line "${TMP_DIR}/tz-named.txt")"
@@ -391,7 +392,8 @@ PY
 )"
 if [ -n "${UTC_WINDOW}" ] && [ "${JST_WINDOW}" = "${EXPECTED_JST}" ] \
    && [ "${NAMED_WINDOW}" = "${EXPECTED_JST}" ] \
-   && cmp -s "${TMP_DIR}/tz-utc.json" "${TMP_DIR}/tz-jst.json"; then
+   && cmp -s <(jq 'del(.analysis.duration_ms)' "${TMP_DIR}/tz-utc.json") \
+             <(jq 'del(.analysis.duration_ms)' "${TMP_DIR}/tz-jst.json"); then
   ASSERT_LOCAL_TIME="PASS"
   ok "Window: ${UTC_WINDOW} (UTC) -> ${JST_WINDOW} (JST-9 and Asia/Tokyo), JSON identical"
 else
