@@ -57,7 +57,7 @@ the same pattern as `daemon-sigterm-drain`.
 3. **Metered shedding fires**: `analysis_shed_batches_total` climbs > 0 and
    `analysis_shed_traces_total` climbs `>= shed_batches` (~300 traces per
    shed batch. Nothing is lost uncounted).
-4. **Ingestion not blocked**: `events_processed_total` climbs by hundreds of
+4. **Ingestion not blocked**: `otlp_spans_received_total` climbs by hundreds of
    thousands during the flood and the daemon stays reachable. This is the
    core regression the worker decoupling prevents.
 5. **Daemon survives**: the pod `restartCount` is unchanged (no OOM under the

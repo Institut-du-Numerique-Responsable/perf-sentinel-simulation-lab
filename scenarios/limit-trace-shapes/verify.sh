@@ -153,7 +153,8 @@ step "Sub-test e: 70 KB SQL statement (target cap is 64 KiB)"
 snapshot_metrics
 EVENTS_BEFORE="$(metric_val perf_sentinel_events_processed_total)"
 OUT="$(run_shape huge_sql --traces 10 --sql-bytes 70000)"
-sleep 8
+# events_processed_total moves when a trace leaves the window (0.45.0), not at intake.
+sleep "${ANALYSIS_WAIT_S}"
 snapshot_metrics
 EVENTS_AFTER="$(metric_val perf_sentinel_events_processed_total)"
 [ $(( EVENTS_AFTER - EVENTS_BEFORE )) -ge 10 ] || die "huge-SQL events did not flow through (truncation broken?)"

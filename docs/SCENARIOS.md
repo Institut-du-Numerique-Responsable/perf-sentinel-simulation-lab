@@ -1711,7 +1711,7 @@ three 0.8.6 surfaces climb/move
 (`perf_sentinel_analysis_shed_batches_total`,
 `perf_sentinel_analysis_shed_traces_total`,
 `perf_sentinel_analysis_queue_depth`), that **ingestion is not blocked
-while analysis sheds** (`events_processed` keeps climbing and
+while analysis sheds** (`otlp_spans_received` keeps climbing and
 `/api/status` answers on every poll), and that the new tunable is
 range-validated (`analysis_queue_capacity = 0` is rejected, via the
 local 0.8.6 binary. Skipped in CI). Fail-loud on worker death

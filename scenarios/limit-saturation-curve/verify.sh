@@ -273,14 +273,15 @@ if [ $(( FINAL_SHED + FINAL_CHFULL )) -eq 0 ] && [ "${RESTARTS_AFTER}" = "${REST
    && [ "${CEILING}" = "none (generator completed)" ]; then
   die "no shed, no channel_full, no restart, no sender backpressure: the ramp never found the limit (raise RAMP)"
 fi
-# Ingestion must never stall while shedding: no TSV row with events_per_s == 0
-# after the first shed.
+# Ingestion must never stall while shedding: no TSV row with spans_recv_per_s == 0
+# after the first shed (events_per_s counts analyzed traces only since 0.45.0, so it
+# skips shed batches and can legitimately read zero here).
 STALLED="$(python3 -c "
 rows=[l.split('\t') for l in open('${TSV}').read().splitlines()[1:]]
 shed_seen=False; stalled=0
 for r in rows:
     if int(r[5])>0: shed_seen=True
-    if shed_seen and int(r[2])==0: stalled+=1
+    if shed_seen and int(r[3])==0: stalled+=1
 print(stalled)")"
 [ "${STALLED}" -le 1 ] || die "ingestion stalled to zero on ${STALLED} samples while shedding"
 [ "${POLLS_OK}" -ge $(( POLLS * 6 / 10 )) ] || die "daemon reachable on only ${POLLS_OK}/${POLLS} polls"

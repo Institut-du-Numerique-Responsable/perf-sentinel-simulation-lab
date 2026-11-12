@@ -22,7 +22,7 @@
 #       perf_sentinel_analysis_shed_traces_total  (counter)
 #   - the shed counters climb (load is shed, observably and metered, not lost);
 #   - shed_traces >= shed_batches (each shed batch carries >=1 trace);
-#   - ingestion is NOT blocked while analysis sheds: events_processed_total
+#   - ingestion is NOT blocked while analysis sheds: otlp_spans_received_total
 #     keeps climbing and the daemon stays reachable through the flood;
 #   - the daemon survives (no pod restart / OOM);
 #   - the new [daemon] analysis_queue_capacity tunable is range-validated
@@ -200,6 +200,9 @@ snapshot_metrics
 SHED_B_BEFORE="$(metric_val perf_sentinel_analysis_shed_batches_total)"
 SHED_T_BEFORE="$(metric_val perf_sentinel_analysis_shed_traces_total)"
 EVENTS_BEFORE="$(metric_val perf_sentinel_events_processed_total)"
+# Intake signal: since 0.45.0 events_processed_total counts analyzed traces only, after
+# the window, so it skips shed batches and lags the flood by up to 1.5 x trace_ttl_ms.
+SPANS_BEFORE="$(metric_val perf_sentinel_otlp_spans_received_total)"
 RESTARTS_BEFORE="$(daemon_restarts)"
 ok "before: shed_batches=${SHED_B_BEFORE} shed_traces=${SHED_T_BEFORE} events=${EVENTS_BEFORE} pod_restarts=${RESTARTS_BEFORE}"
 
@@ -237,18 +240,20 @@ snapshot_metrics
 SHED_B_AFTER="$(metric_val perf_sentinel_analysis_shed_batches_total)"
 SHED_T_AFTER="$(metric_val perf_sentinel_analysis_shed_traces_total)"
 EVENTS_AFTER="$(metric_val perf_sentinel_events_processed_total)"
+SPANS_AFTER="$(metric_val perf_sentinel_otlp_spans_received_total)"
 RESTARTS_AFTER="$(daemon_restarts)"
 D_SHED_B=$(( SHED_B_AFTER - SHED_B_BEFORE ))
 D_SHED_T=$(( SHED_T_AFTER - SHED_T_BEFORE ))
 D_EVENTS=$(( EVENTS_AFTER - EVENTS_BEFORE ))
-ok "after: d_shed_batches=${D_SHED_B} d_shed_traces=${D_SHED_T} d_events=${D_EVENTS} qdepth_max=${QDEPTH_MAX} pod_restarts=${RESTARTS_AFTER}"
+D_SPANS=$(( SPANS_AFTER - SPANS_BEFORE ))
+ok "after: d_shed_batches=${D_SHED_B} d_shed_traces=${D_SHED_T} d_spans=${D_SPANS} d_events=${D_EVENTS} qdepth_max=${QDEPTH_MAX} pod_restarts=${RESTARTS_AFTER}"
 
 # =============================================================================
 step "Compute verdict"
 DAEMON_ALIVE="$(curl -fsS "http://localhost:${DAEMON_LOCAL_PORT}/api/status" >/dev/null 2>&1 && echo yes || echo no)"
 PASS_SHED_B=$([ "${D_SHED_B}" -gt 0 ] && echo yes || echo no)
 PASS_SHED_T=$([ "${D_SHED_T}" -ge "${D_SHED_B}" ] && [ "${D_SHED_T}" -gt 0 ] && echo yes || echo no)
-PASS_INGEST=$([ "${D_EVENTS}" -gt 0 ] && echo yes || echo no)
+PASS_INGEST=$([ "${D_SPANS}" -gt 0 ] && echo yes || echo no)
 PASS_SURVIVE=$([ "${RESTARTS_AFTER}" -le "${RESTARTS_BEFORE}" ] && echo yes || echo no)
 # Tolerant: a busy daemon may miss an occasional poll; require >=70% reachable.
 PASS_LIVE=$([ "$(( POLLS_OK * 100 ))" -ge "$(( POLLS * 70 ))" ] && [ "${POLLS}" -gt 0 ] && echo yes || echo no)
@@ -282,7 +287,8 @@ step "Write report"
   echo "- analysis_shed_batches_total delta: ${D_SHED_B}"
   echo "- analysis_shed_traces_total delta: ${D_SHED_T}"
   echo "- analysis_queue_depth max sampled: ${QDEPTH_MAX} (cap=${SHED_CAP}; backlog is transient at this cap)"
-  echo "- events_processed_total delta (ingestion): ${D_EVENTS}"
+  echo "- otlp_spans_received_total delta (ingestion): ${D_SPANS}"
+  echo "- events_processed_total delta (analyzed, informational): ${D_EVENTS}"
   echo "- daemon reachable during flood: ${POLLS_OK}/${POLLS} polls"
   echo "- pod restartCount: ${RESTARTS_BEFORE} -> ${RESTARTS_AFTER}"
   echo
@@ -291,14 +297,14 @@ step "Write report"
   echo "- daemon alive post-load: ${DAEMON_ALIVE}"
   echo "- shed_batches climbed (metered shedding fires): ${PASS_SHED_B}"
   echo "- shed_traces climbed and >= shed_batches (>=1 trace per shed batch): ${PASS_SHED_T}"
-  echo "- ingestion NOT blocked while shedding (events_processed climbed): ${PASS_INGEST}"
+  echo "- ingestion NOT blocked while shedding (otlp_spans_received climbed): ${PASS_INGEST}"
   echo "- daemon survived the flood (no OOM/restart): ${PASS_SURVIVE}"
   echo "- daemon reachable through the flood (>=70% polls): ${PASS_LIVE}"
   echo "- analysis_queue_capacity range-validation (0 rejected): ${BOUNDS_RESULT}"
   echo
   echo "## Notes"
   echo
-  echo "- Ingestion (events_processed_total += ${D_EVENTS}) dwarfs the shed accounting:"
+  echo "- Ingestion (otlp_spans_received_total += ${D_SPANS}) dwarfs the shed accounting:"
   echo "  the daemon kept ingesting and evicting while the analysis worker shed"
   echo "  whole batches -- exactly the decoupling 0.8.6 introduces. Shed is metered"
   echo "  (both counters move together, ~${SHED_CAP:+}300 traces per shed batch), never silent."

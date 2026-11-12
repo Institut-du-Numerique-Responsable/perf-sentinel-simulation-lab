@@ -18,5 +18,5 @@ derived table is embedded in the scenario report.
 ## Asserts
 
 - The ramp eventually trips shedding or channel_full (the limit was found).
-- Ingestion never stalls to zero while shedding.
+- Ingestion (OTLP spans received per second) never stalls to zero while shedding.
 - Daemon answers >= 70% of polls, zero restarts (no OOM), RSS <= 256 MiB.

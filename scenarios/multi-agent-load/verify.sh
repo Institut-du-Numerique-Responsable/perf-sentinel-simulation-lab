@@ -88,8 +88,9 @@ kubectl -n "${NS}" wait --for=condition=Complete --timeout="${TIMEOUT_SEC}s" \
   || die "Job did not complete in ${TIMEOUT_SEC}s, see ${TMP_DIR}/wait.log"
 ok "Job complete"
 
-step "Wait 30s for daemon to drain in-flight buffer"
-sleep 30
+step "Wait 45s for the daemon to drain in-flight traces"
+# events_processed moves when a trace leaves the window: up to 1.5 x the 30 s trace_ttl_ms.
+sleep 45
 
 step "Snapshot daemon metrics after load"
 curl -fsS "http://localhost:${DAEMON_LOCAL_PORT}/api/export/report" > "${TMP_DIR}/report-after.json"
