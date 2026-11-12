@@ -1,6 +1,6 @@
 apiVersion: v2
 name: helidon-se-svc
-description: Helidon SE 4.4.0 LTS stack member of the perf-sentinel multistack lab.
+description: Helidon SE 4.5.6 LTS stack member of the perf-sentinel multistack lab.
 type: application
 version: 1.0.0
 appVersion: "s2"
