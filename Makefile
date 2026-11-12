@@ -685,7 +685,7 @@ verify-hub-derived-status: ## active -> likely_resolved -> not_observed, with th
 verify-hub-detection-volume: ## Hub 0.8.6 detection volume: the same total by poll and push, two ledgers over a restart, multi_instance behind one address (local Hub + two 0.37.0 daemons, no cluster)
 	./scenarios/hub-detection-volume/verify.sh
 
-verify-hub-recap: ## Hub 0.9.0 recap: the day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader (local Hub + a 0.38.0 daemon, no cluster)
+verify-hub-recap: ## Hub 0.9.0 recap: the day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader; Hub 0.18.0 action hand-over and a delivery held until DeliverAt (local Hub + a 0.38.0 daemon, no cluster)
 	./scenarios/hub-recap/verify.sh
 
 verify-hub-card: ## Hub 0.10.0 share cards: a closed week's confirmed fix, a story card in png/svg/jxl/pdf verified offline, key rotation and revocation, the watch list to a real daemon, cards.write, the render limit (local Hub + a 0.39.0 daemon, no cluster)

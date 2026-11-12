@@ -28,6 +28,12 @@
 #   R9 (Hub 0.11.0) an on-demand report in French: `language` fr, both pages
 #      <html lang="fr">, the management page reads "Une étape sans nom dans";
 #      ?lang=en renders the same report in English.
+#   R10 (Hub 0.18.0) an action changes hands: bob takes it over, hands it to
+#      carol, alice clears it and takes it back; the status never moves and
+#      each change is an event naming who made it.
+#   R11 (Hub 0.18.0) a second subscription with DeliverAt and TimeZone freezes
+#      yesterday at once but holds its webhook until that time, across a Hub
+#      restart, then sends it signed; the first subscription is not sent again.
 #
 # A daemon started today holds no sealed yesterday, and a subscription only
 # freezes a closed period. The scenario therefore pushes, with the source's
@@ -59,6 +65,9 @@ SVC="hrc-shop"
 K="${HRC_K:-8}"
 OWNER="alice.martin@acme.com"
 OWNER_NAME="Alice Martin"
+OTHER="bob.durand@acme.com"
+THIRD="carol.dupont@acme.com"
+HELD_ZONE="Europe/Paris"
 ENDPOINT_LABEL="Showing an order"
 SERVICE_LABEL="Shop front"
 MAIL_TO="team.lead@acme.example"
@@ -144,7 +153,7 @@ ok "daemon: ${PERF_SENTINEL_LOCAL_BIN} ${BIN_VERSION}"
 ok "Hub: ${HUB_DLL}"
 # Today and yesterday are UTC days: a run across midnight would split the load between two.
 TO_MIDNIGHT="$(python3 -c 'import time; print(86400 - int(time.time()) % 86400)')"
-if [ "${TO_MIDNIGHT}" -lt 420 ]; then
+if [ "${TO_MIDNIGHT}" -lt 600 ]; then
   color_yellow "    ${TO_MIDNIGHT} s to UTC midnight: waiting it out so the run stays within one day"
   sleep $((TO_MIDNIGHT + 5))
 fi
@@ -423,6 +432,42 @@ print(a.get("status"), a.get("owner"), r["tiles"]["actions"]["in_progress"])' "$
 [ "${R2_RECAP}" = "in_progress ${OWNER} 1" ] || die "R2 the recap reads the action as '${R2_RECAP}'"
 ok "201, the recap carries in_progress by ${OWNER}, tiles.actions.in_progress 1"
 
+# --- R10 -------------------------------------------------------------------------
+step "R10 (Hub 0.18.0) the action changes hands and keeps its status"
+patch_action() {  # $1 = name, $2 = caller, $3 = body; prints the code
+  req "$1" PATCH /api/actions -H 'Content-Type: application/json' -H "X-Forwarded-User: $2" --data "$3"
+}
+owner_of() { py 'a = j(sys.argv[3]); print(a["status"], a["owner"])' "$1"; }
+CODE="$(patch_action r10-take "${OTHER}" "{\"signature\":\"${SIG_O}\",\"take\":true}")"
+[ "${CODE}" = "400" ] && die "R10 PATCH take is a 400: Hub ${HUB_VERSION} has no take over (0.18.0 and later)"
+expect_code "R10 ${OTHER} takes it over" "${CODE}" 200 r10-take
+[ "$(owner_of r10-take)" = "in_progress ${OTHER}" ] || die "R10 after the take over: '$(owner_of r10-take)'"
+CODE="$(patch_action r10-mixed "${OTHER}" "{\"signature\":\"${SIG_O}\",\"take\":true,\"status\":\"done\"}")"
+expect_code "R10 a take with a status" "${CODE}" 400 r10-mixed
+CODE="$(patch_action r10-none "${OTHER}" "{\"signature\":\"${SIG_I}\",\"take\":true}")"
+expect_code "R10 a take over of a finding with no action" "${CODE}" 404 r10-none
+CODE="$(patch_action r10-assign "${OTHER}" "{\"signature\":\"${SIG_O}\",\"owner\":\"${THIRD}\"}")"
+expect_code "R10 ${OTHER} hands it to ${THIRD}" "${CODE}" 200 r10-assign
+[ "$(owner_of r10-assign)" = "in_progress ${THIRD}" ] || die "R10 after the hand-over: '$(owner_of r10-assign)'"
+CODE="$(patch_action r10-clear "${OWNER}" "{\"signature\":\"${SIG_O}\",\"owner\":null}")"
+expect_code "R10 ${OWNER} clears the owner" "${CODE}" 200 r10-clear
+[ "$(owner_of r10-clear)" = "in_progress None" ] || die "R10 after the clear: '$(owner_of r10-clear)'"
+CODE="$(patch_action r10-back "${OWNER}" "{\"signature\":\"${SIG_O}\",\"take\":true}")"
+expect_code "R10 ${OWNER} takes it back" "${CODE}" 200 r10-back
+[ "$(owner_of r10-back)" = "in_progress ${OWNER}" ] || die "R10 after the take back: '$(owner_of r10-back)'"
+CODE="$(req r10-recap GET "/api/recap?period=day")"
+expect_code "R10 recap" "${CODE}" 200 r10-recap
+py 'r = j("r10-recap")
+a = next(p for p in r["priorities"] if p.get("signature") == sys.argv[3])["action"]
+want = [("in_progress", "in_progress", o, by) for o, by in
+        ((sys.argv[4], sys.argv[4]), (sys.argv[5], sys.argv[4]), (None, sys.argv[6]), (sys.argv[6], sys.argv[6]))]
+got = [(e["from"], e["to"], e["owner"], e["by"]) for e in a["events"]][-4:]
+assert got == want, got
+assert len(a["events"]) == 5 and a["status"] == "in_progress" and a["owner"] == sys.argv[6], a
+assert r["tiles"]["actions"]["in_progress"] == 1, r["tiles"]["actions"]
+print("ok")' "${SIG_O}" "${OTHER}" "${THIRD}" "${OWNER}" >/dev/null || die "R10 the recap's action: see above"
+ok "${OTHER} takes over (200), take+status 400, take over with no action 404, hands to ${THIRD}, ${OWNER} clears then takes back; in_progress throughout, 4 events naming who"
+
 # --- R3 --------------------------------------------------------------------------
 step "R3 labels name the endpoint and the service"
 LABEL="{\"service\":\"${SVC}\",\"endpoint\":\"/api/orders\",\"label\":\"${ENDPOINT_LABEL}\"}"
@@ -528,7 +573,7 @@ PIDS+=($!); disown "$!" 2>/dev/null || true
 python3 "${TMP_DIR}/smtp.py" "${SMTP_PORT}" "${TMP_DIR}/mail" &
 PIDS+=($!); disown "$!" 2>/dev/null || true
 stop_hub
-start_hub \
+PHASE2=(
   Hub__AckRelay__TrustIdentityHeader=true \
   Hub__Recaps__PublicUrl="${HUB_URL}" \
   Hub__Recaps__Webhooks__0__Name=hrc-hook \
@@ -545,6 +590,8 @@ start_hub \
   Hub__Recaps__Subscriptions__0__Views__1=tech \
   Hub__Recaps__Subscriptions__0__Webhooks__0=hrc-hook \
   Hub__Recaps__Subscriptions__0__Emails__0="${MAIL_TO}"
+)
+start_hub "${PHASE2[@]}"
 ok "Hub restarted with subscription hrc-daily (day, both views, webhook hrc-hook, ${MAIL_TO})"
 
 # The loop ticks every 15 s: one tick freezes yesterday, the same pass delivers it.
@@ -641,6 +688,95 @@ read -r R7_VERDICT R7_BYTES R7_SUBJECT <<< "${R7}"
 case ",${SUB_DELIVERIES}," in *,email:delivered,*) ;; *) die "R7 the report's deliveries read ${SUB_DELIVERIES}" ;; esac
 ok "'${R7_SUBJECT//_/ }' to ${MAIL_TO}, one ${R7_BYTES}-character pilotage attachment, no @ outside <style>, email delivered"
 
+# --- R11 -------------------------------------------------------------------------
+step "R11 (Hub 0.18.0) a subscription held until its DeliverAt time in ${HELD_ZONE}"
+# The next whole minute at least one minute away, so the freeze, the checks and a restart fit before it.
+read -r DELIVER_AT DUE_MS <<< "$(python3 -c '
+import datetime, sys, zoneinfo
+now = datetime.datetime.now(zoneinfo.ZoneInfo(sys.argv[1]))
+due = (now + datetime.timedelta(minutes=2)).replace(second=0, microsecond=0)
+print(due.strftime("%H:%M"), int(due.timestamp() * 1000))' "${HELD_ZONE}")"
+HELD=(
+  Hub__Recaps__Subscriptions__1__Name=hrc-held
+  Hub__Recaps__Subscriptions__1__Cadences__0=day
+  Hub__Recaps__Subscriptions__1__Views__0=pilotage
+  Hub__Recaps__Subscriptions__1__Webhooks__0=hrc-hook
+  Hub__Recaps__Subscriptions__1__DeliverAt="${DELIVER_AT}"
+  Hub__Recaps__Subscriptions__1__TimeZone="${HELD_ZONE}"
+)
+stop_hub
+start_hub "${PHASE2[@]}" "${HELD[@]}"
+now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
+# hook_count SUBSCRIPTION: the webhook POSTs the receiver holds for it.
+hook_count() {
+  python3 - "${TMP_DIR}/hook" "$1" <<'PY'
+import glob, json, sys
+print(sum(json.load(open(f, "rb")).get("subscription") == sys.argv[2] for f in glob.glob(sys.argv[1] + "/*.raw")))
+PY
+}
+# held_state: "<report id> <period from> <channel:state:next_attempt_ms...>" of hrc-held, or none.
+held_state() {
+  req held GET /api/recap/reports -H "X-Forwarded-User: ${OWNER}" >/dev/null || true
+  py 'r = [r for r in j("held") if r["subscription"] == "hrc-held"]
+assert len(r) <= 1, r
+print("none" if not r else "%s %s %s" % (r[0]["id"], r[0]["period"]["from"],
+      ",".join("%s:%s:%s" % (d["channel"], d["state"], d["next_attempt_ms"]) for d in r[0]["deliveries"])))' \
+    2>/dev/null || echo "unreadable"
+}
+HELD_STATE="none"
+for _ in $(seq 1 45); do
+  HELD_STATE="$(held_state)"
+  case "${HELD_STATE}" in none|unreadable) sleep 1 ;; *) break ;; esac
+done
+read -r HELD_ID HELD_FROM HELD_DELIVERIES <<< "${HELD_STATE}"
+[ "${HELD_ID}" != "none" ] && [ "${HELD_ID}" != "unreadable" ] \
+  || die "R11 hrc-held froze nothing within 45 s (hub log: $(tail -3 "${TMP_DIR}/hub.log"))"
+[ "${HELD_FROM}" = "${YESTERDAY_ISO}" ] || die "R11 hrc-held froze ${HELD_FROM}, want ${YESTERDAY_ISO}"
+[ "${HELD_DELIVERIES}" = "webhook:pending:${DUE_MS}" ] \
+  || die "R11 hrc-held's delivery reads ${HELD_DELIVERIES}, want webhook:pending:${DUE_MS} (${DELIVER_AT} ${HELD_ZONE})"
+[ "$(now_ms)" -lt "${DUE_MS}" ] || die "R11 the freeze took past ${DELIVER_AT}: no time left to see the delivery held"
+[ "$(hook_count hrc-held)" = "0" ] || die "R11 hrc-held's webhook left before ${DELIVER_AT}"
+ok "report ${HELD_ID} of ${HELD_FROM} frozen at once, its webhook pending until ${DELIVER_AT} ${HELD_ZONE} (${DUE_MS})"
+
+stop_hub
+start_hub "${PHASE2[@]}" "${HELD[@]}"
+HELD_AFTER="$(held_state)"
+[ "${HELD_AFTER}" = "${HELD_STATE}" ] || die "R11 after a restart hrc-held reads '${HELD_AFTER}', was '${HELD_STATE}'"
+[ "$(now_ms)" -lt "${DUE_MS}" ] || die "R11 the restart took past ${DELIVER_AT}: the held state was not seen across it"
+[ "$(hook_count hrc-held)" = "0" ] || die "R11 hrc-held's webhook left before ${DELIVER_AT}, after the restart"
+ok "after a restart: the same report, still pending until ${DUE_MS}, nothing sent"
+
+# The loop ticks every 15 s: the delivery leaves on the first tick at or after its time.
+DEADLINE=$(( DUE_MS + 60000 ))
+while [ "$(hook_count hrc-held)" = "0" ] && [ "$(now_ms)" -lt "${DEADLINE}" ]; do sleep 2; done
+[ "$(hook_count hrc-held)" = "1" ] || die "R11 hrc-held's webhook: $(hook_count hrc-held) POSTs by ${DELIVER_AT} + 60 s"
+for _ in $(seq 1 20); do
+  HELD_STATE="$(held_state)"
+  case "${HELD_STATE}" in *:delivered:*) break ;; *) sleep 1 ;; esac
+done
+R11="$(python3 - "${TMP_DIR}/hook" "${HOOK_SECRET}" "${HELD_ID}" "${DUE_MS}" <<'PY'
+import glob, hashlib, hmac, json, sys
+d, secret, rid, due = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
+raw = next(open(f, "rb").read() for f in sorted(glob.glob(d + "/*.raw"))
+           if json.loads(open(f, "rb").read()).get("subscription") == "hrc-held")
+f = next(f for f in sorted(glob.glob(d + "/*.raw")) if open(f, "rb").read() == raw)
+h = {k.lower(): v for k, v in json.load(open(f[:-4] + ".json"))["headers"].items()}
+ts = h.get("x-perfsentinel-timestamp", "0")
+want = "sha256=" + hmac.new(secret.encode(), ts.encode() + b"." + raw, hashlib.sha256).hexdigest()
+checks = {
+    "signature verifies": hmac.compare_digest(h.get("x-perfsentinel-signature", ""), want),
+    "sent at or after its time": int(ts) * 1000 >= due,
+    "the held report": json.loads(raw)["report_id"] == rid,
+}
+print("; ".join(k for k, v in checks.items() if not v) or "ok", int(ts) - due // 1000)
+PY
+)"
+read -r R11_VERDICT R11_LATE <<< "${R11}"
+[ "${R11_VERDICT}" = "ok" ] || die "R11 the held webhook fails: ${R11}"
+case "${HELD_STATE}" in *webhook:delivered:*) ;; *) die "R11 hrc-held's delivery reads ${HELD_STATE}" ;; esac
+[ "$(hook_count hrc-daily)" = "1" ] || die "R11 hrc-daily was sent $(hook_count hrc-daily) times over the restarts"
+ok "sent ${R11_LATE} s after ${DELIVER_AT} ${HELD_ZONE}, HMAC verifies, delivered; hrc-daily still sent once"
+
 # --- R8 --------------------------------------------------------------------------
 step "Phase 3: access control, alice (member) and bob (reader)"
 hash_pw() {
@@ -730,9 +866,11 @@ ok "401 anonymous; alice 201 then 200 (report and page); bob reads the recap (20
   echo "| R3 | labels in the pilotage view | '${ENDPOINT_LABEL}' and '${SERVICE_LABEL}', no technical key |"
   echo "| R4 | on-demand report | ${REPORT_ID}, listed, both pages 200 with a CSP, no external load |"
   echo "| R9 | report in French (Hub 0.11.0) | ${FR_ID}, language fr, lang=fr pages, ?lang=en in English |"
+  echo "| R10 | an action changes hands (Hub 0.18.0) | ${OTHER} takes over, hands to ${THIRD}, ${OWNER} clears and takes back, status kept, 4 events |"
   echo "| R5 | management page | '${OWNER_NAME}', 'An unnamed step in ${SERVICE_LABEL}', no @ outside <style>, no endpoint |"
   echo "| R6 | signed webhook | report ${SUB_ID}, HMAC verifies, management view only, no @ |"
   echo "| R7 | e-mail | pilotage attachment, no @ outside <style>, ${SUB_DELIVERIES} |"
+  echo "| R11 | delivery held until DeliverAt (Hub 0.18.0) | ${HELD_ID} pending until ${DELIVER_AT} ${HELD_ZONE} across a restart, sent ${R11_LATE} s after, signed |"
   echo "| R8 | reports under access control | bob 404 on alice's report and pages, the unknown-id body |"
   echo ""
   echo "Checks: ${CHECKS}"

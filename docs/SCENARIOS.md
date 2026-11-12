@@ -196,7 +196,7 @@ Findings produced by the standard rule omit the field.
 | [`detection-carbon`](#detection-carbon-0380-the-days-avoidable-carbon-in-the-ledger) | 0.38.0 detection ledger carbon: the day's avoidable gCO2 and I/O sums on the API and the push, a carbon-only resend, absent with green off | local binary | PASS   |
 | [`card-signal`](#card-signal-0390-runs-under-a-watched-threshold) | 0.39.0 card signal: a Hub `watch` list makes the daemon count runs at or under a slow threshold (`below_threshold_passes`, `detections: 0`), `thresholds` on each day, nothing without `watch`, the list lost on restart | local binary | PASS   |
 | [`card-cli`](#card-cli-0390-share-card-commands) | 0.39.0 share cards: keygen, render of 3 angles in png/pdf/svg/jxl, verify-card offline, a retouched PNG, C3 refusals, `--online` through a fake DoH and well-known origin | local binary | PASS   |
-| [`hub-recap`](#hub-recap-090-review-recap-reports-and-deliveries) | Hub 0.9.0 recap: the 0.38.0 day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader | local Hub + local binary | PASS   |
+| [`hub-recap`](#hub-recap-090-review-recap-reports-and-deliveries) | Hub 0.9.0 recap: the 0.38.0 day carbon priced, actions and labels, frozen reports signed to a webhook and mailed, a report hidden from another reader; Hub 0.18.0 action hand-over and a delivery held until `DeliverAt` | local Hub + local binary | PASS   |
 | [`hub-card`](#hub-card-0100-share-cards) | Hub 0.10.0 share cards: a closed week's confirmed fix, a story card in png/svg/jxl/pdf that `verify-card` checks offline, key rotation and revocation, the watch list to a real 0.39.0 daemon, `cards.write`, the render limit | local Hub + local binary | PASS   |
 
 The first nine rows are the core deployment-mode scenarios.
@@ -3750,7 +3750,7 @@ FAIL on Hub 0.8.5 (step 1, the windowed read carries no `detections`), PASS on 0
 `make verify-hub-recap`. Self-contained: a Release build of the Hub run as a local `dotnet`
 process, one 0.38.0 daemon from the local binary with green scoring on, python3 with
 `opentelemetry-proto`, curl. The webhook receiver and the SMTP sink are stdlib Python. No
-cluster, no Docker, under a minute. It SKIPs with exit 0 when the daemon binary, the Hub build,
+cluster, no Docker, about three minutes. It SKIPs with exit 0 when the daemon binary, the Hub build,
 `dotnet` or `opentelemetry-proto` is absent.
 
 `detection-carbon` proves the daemon's day carbon, the Hub's tests prove the recap with a fake
@@ -3768,8 +3768,13 @@ key, the sealed ledger day a previous daemon instance would have pushed for yest
 6. The subscription's webhook verifies as HMAC-SHA256 of `<timestamp>.<body>`, management view only.
 7. Its e-mail attaches the management page, with no `@` outside the stylesheet.
 8. Under access control a report one member generated is the unknown-id 404 to another reader.
+9. (Hub 0.11.0) A report in French reads in French, and `?lang=en` renders it in English.
+10. (Hub 0.18.0) An action changes hands: taken over with `PATCH` `take`, handed to someone,
+    cleared and taken back, its status kept and each change an event naming who made it.
+11. (Hub 0.18.0) A subscription with `DeliverAt` and `TimeZone` freezes at once but holds its
+    webhook until that time, across a Hub restart, then sends it signed.
 
-PASS on 0.9.0 with the 0.38.0 daemon. A Hub before 0.9.0 answers `GET /api/recap` with a 404.
+PASS on 0.9.0 with the 0.38.0 daemon, and on 0.18.0 with the 0.45.0 daemon (21 checks). A Hub before 0.9.0 answers `GET /api/recap` with a 404.
 
 ## hub-card (0.10.0 share cards)
 

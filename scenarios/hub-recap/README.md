@@ -34,6 +34,8 @@ local accounts.
 | R7 | the same report reaches a loopback SMTP sink for the subscribed address with one attachment, `perf-sentinel-recap-<day>-pilotage.html`, `text/html`, no `@` outside its `<style>`, the engineering link in the body, the delivery `delivered` |
 | R8 | under access control, a report `local:alice` (built-in `member` on `*`) generated reads 200 to her, page included; `local:bob` (`reader` on `*`) reads the recap but gets 404 on her report, on both pages and on the subscription report, with the very body an unknown id gets; bob lists none, alice her own; no session is a 401 |
 | R9 | Hub 0.11.0: `POST /api/recap/reports` with `lang: fr` gives `language: fr`, both pages `<html lang="fr">`, the management page reads `Une étape sans nom dans <service label>` (compared on the HTML-decoded text, the page writes `&#233;`); `?lang=en` renders the same report in English |
+| R10 | Hub 0.18.0: `PATCH /api/actions` `{"take":true}` as `bob.durand@acme.com` is a 200 that hands him the action, `take` with a `status` is a 400 and a take over of a finding with no action a 404; bob hands it to `carol.dupont@acme.com`, alice clears the owner (`null`) and takes it back. The status stays `in_progress`, and the recap's events end with those four changes, each naming who made it |
+| R11 | Hub 0.18.0: a second subscription, `hrc-held`, with `DeliverAt` the next whole minute at least one minute away and `TimeZone: Europe/Paris`, freezes yesterday on its first tick with its webhook `pending` and `next_attempt_ms` at that time, nothing sent; after a Hub restart the same report is still pending at the same time; the webhook then leaves on the first tick at or after it, signed, and the delivery reads `delivered`. `hrc-daily` is not sent again over the restarts |
 
 The management page inlines a stylesheet with `@media` rules, so "no `@`" is
 checked outside `<style>`; the e-mail pattern is checked over the whole page.
@@ -61,13 +63,20 @@ The Hub runs as a local `dotnet` process from a Release build, the daemon from
 the local perf-sentinel binary. python3 with `opentelemetry-proto`, curl. The
 webhook receiver and the SMTP sink are stdlib Python. No cluster, no Docker, no
 outbound call (`Hub:UpdateCheck` is off, the OAuth provider is never contacted).
-Ports 14970 to 14977 (`HRC_BASE_PORT`). About 45 seconds, more when the daemon's
-first ledger push waits for its minute. Within 7 minutes of UTC midnight it
+Ports 14970 to 14977 (`HRC_BASE_PORT`). About three minutes: R11 waits one to
+two minutes for its `DeliverAt` time, and the daemon's first ledger push may wait
+for its minute. Within 10 minutes of UTC midnight it
 waits for the next day first, since today and yesterday are UTC days.
 `KEEP_TMP=yes` keeps the logs. Report at `/tmp/scenario-hub-recap-report.md`.
 
 The scenario SKIPs with exit 0 when the daemon binary, the Hub build, `dotnet`
 or `opentelemetry-proto` is absent. A port already answering is a failure.
+
+## What it found (2026-11-12)
+
+PASS on Hub 0.18.0 (fe45d95) with the 0.45.0 daemon, 21 checks. R11 saw the
+webhook held until 22:27 Europe/Paris across a restart, then sent 11 s after it,
+within the loop's 15-second tick.
 
 ## What it found (2026-10-29)
 
