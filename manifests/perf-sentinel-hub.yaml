@@ -127,7 +127,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: perf-sentinel-hub
-          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel-hub@sha256:764fd7ee6540e7b7f0de2570c913ee41a3b4472f12d2841ffa8aab22b9c5b841  # 0.18.0
+          image: ghcr.io/institut-du-numerique-responsable/perf-sentinel-hub@sha256:ae62ed9a7e1aa2ab9e0bba86ad8b0039901792419732f3b5c3c62b15fd13ce42  # 0.18.1
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
