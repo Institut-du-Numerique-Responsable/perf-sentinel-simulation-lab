@@ -2,8 +2,9 @@
 # limit-trace-shapes: adversarial trace shapes against the committed daemon,
 # at low rate through the port-forward. One trait per sub-test:
 #   (a) max_events  : one trace far above max_events_per_trace (ring buffer
-#                     drops oldest spans SILENTLY -- documented as a feedback
-#                     item, the drop has no counter today)
+#                     drops the oldest spans, counted exactly by
+#                     perf_sentinel_trace_events_dropped_total since 0.47.0,
+#                     and named in the tuning warnings of /api/export/report)
 #   (b) deep_chain  : 400-deep parent chain (OTLP code-attr walk caps at 8,
 #                     explain tree depth guard at 256)
 #   (c) wide_fanout : 1200 sibling children under one root
@@ -91,12 +92,33 @@ run_shape() {
 }
 
 # =============================================================================
-step "Sub-test a: one trace with 1500 spans (max_events_per_trace cap, silent ring drop)"
+step "Sub-test a: three traces of 1500 SQL spans (max_events_per_trace cap, counted ring drop)"
+CAP="$(curl -fsS "${ENDPOINT}/api/config" \
+  | python3 -c 'import sys,json;print(int(json.load(sys.stdin)["max_events_per_trace"]))')"
+[ "${CAP}" -lt 1500 ] || die "max_events_per_trace=${CAP} is not below 1500, sub-test a drops nothing"
+snapshot_metrics
+DROPPED_BEFORE="$(metric_val perf_sentinel_trace_events_dropped_total)"
 OUT="$(run_shape max_events --traces 3 --events-per-trace 1500)"
-sleep 8  # let the TTL evict and the worker analyze
+# The drop is counted at ingest, but /api/export/report answers with the
+# cold-start envelope, advisor rules left out, until a trace is analysed.
+sleep "${ANALYSIS_WAIT_S}"
+snapshot_metrics
+grep -q "^# TYPE perf_sentinel_trace_events_dropped_total counter" "${TMP_DIR}/metrics.txt" \
+  || die "perf_sentinel_trace_events_dropped_total absent (daemon older than 0.47.0?)"
+DROPPED=$(( $(metric_val perf_sentinel_trace_events_dropped_total) - DROPPED_BEFORE ))
+# One export request, one window: every event past the cap is dropped once.
+EXPECTED_DROPPED=$(( 3 * (1500 - CAP) ))
+[ "${DROPPED}" -eq "${EXPECTED_DROPPED}" ] \
+  || die "trace_events_dropped_total moved by ${DROPPED}, want ${EXPECTED_DROPPED} (3 x (1500 - cap ${CAP}))"
 curl -fsS "${ENDPOINT}/api/export/report" > "${TMP_DIR}/report-a.json" || die "export/report unreachable after max_events"
-python3 -c "import json;json.load(open('${TMP_DIR}/report-a.json'))" || die "export/report not parseable after max_events"
-RESULT_max_events="sent $(echo "${OUT}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["spans"])') spans, daemon stable (drop is unmetered: feedback item)"
+python3 - "${TMP_DIR}/report-a.json" "${CAP}" <<'PY' || die "no tuning warning naming the per-trace cap in /api/export/report"
+import json, sys
+d = json.load(open(sys.argv[1]))
+msgs = [w.get("message", "") for w in (d.get("warning_details") or [])]
+want = "max_events_per_trace (currently %s)" % sys.argv[2]
+sys.exit(0 if any("dropped at the per-trace cap" in m and want in m for m in msgs) else 1)
+PY
+RESULT_max_events="sent $(echo "${OUT}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["spans"])') spans, ${DROPPED} events dropped at cap ${CAP} and counted, tuning warning present"
 ok "${RESULT_max_events}"
 
 # =============================================================================
@@ -190,9 +212,8 @@ verdict="PASS"
   echo "| restarts | ${RESTARTS_BEFORE} -> ${RESTARTS_AFTER} |"
   echo "| rss | $(( RSS_BEFORE/1048576 )) -> $(( RSS_AFTER/1048576 )) MiB |"
   echo ""
-  echo "Feedback items: the per-trace ring-buffer drop above max_events_per_trace"
-  echo "is unmetered (no counter), and duplicate trace ids across the TTL are"
-  echo "double-counted by design."
+  echo "Feedback items: duplicate trace ids across the TTL are double-counted"
+  echo "by design."
   echo ""
   echo "Verdict: **${verdict}**"
 } > "${REPORT}"

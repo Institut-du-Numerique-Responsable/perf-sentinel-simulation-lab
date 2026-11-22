@@ -16,6 +16,9 @@ release image exists) and `opentelemetry-proto` on the host python3.
 
 ## Asserts
 
+- The ring-buffer drop above `max_events_per_trace` moves
+  `perf_sentinel_trace_events_dropped_total` by exactly 3 x (1500 - cap), and
+  `/api/export/report` carries the tuning warning naming the cap (0.47.0+).
 - Zero pod restarts across all five shapes, RSS at the end under 200 MiB
   (the pod limit is 256Mi).
 - Deep chains ingest without a latency cliff, all spans received.
@@ -26,5 +29,4 @@ release image exists) and `opentelemetry-proto` on the host python3.
 
 ## Known feedback items
 
-- The per-trace ring-buffer drop above `max_events_per_trace` is
-  unmetered (no counter) - upstream follow-up.
+- Duplicate trace ids across the TTL are double-counted by design.
