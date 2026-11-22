@@ -31,6 +31,7 @@ coexist.
 | G2 | The reader's query answers an empty vector: the figure turns `database_specpower` while the writer keeps its reading, so the power is writer live plus reader ceiling, not two ceilings. The age gauge reads the silent group. |
 | G3 | The reader comes back: `cloud_specpower` again, and the energy over the outage and recovery is billed once. A reading stacked on the ceiling would add the reader's live power over the whole outage. |
 | B1 | Broker groups next to database groups: `messaging_waste` on `cloud_specpower`, broker power equal to its groups' envelope. |
+| B2 | The avoidable energy and carbon counters (0.48.0+) grow under all-N+1 traffic and stay inside `perf_sentinel_scored_energy_kwh_total` and `perf_sentinel_scored_carbon_gco2_total` over the measure window. |
 
 Powers are read as the slope of `perf_sentinel_scored_database_energy_kwh_total`
 and `perf_sentinel_scored_broker_energy_kwh_total` over 20 s, within 12

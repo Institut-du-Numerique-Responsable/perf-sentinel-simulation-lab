@@ -501,6 +501,30 @@ if start_daemon broker.toml daemon-broker.log; then
   else
     assert_fail B1 "messaging_waste never reached cloud_specpower (last: '$(waste_model messaging_waste)')"
   fi
+  # B2: the avoidable counters (0.48.0+) move with their totals and stay a
+  # subset of them. The traffic is all N+1, so both must grow.
+  if curl -fsS "${DAEMON_URL}/metrics" | grep -q "^# TYPE perf_sentinel_scored_avoidable_energy_kwh_total counter"; then
+    e0="$(metric perf_sentinel_scored_energy_kwh_total)"; a0="$(metric perf_sentinel_scored_avoidable_energy_kwh_total)"
+    g0="$(metric perf_sentinel_scored_carbon_gco2_total)"; c0="$(metric perf_sentinel_scored_avoidable_carbon_gco2_total)"
+    sleep "${MEASURE_SECS}"
+    e1="$(metric perf_sentinel_scored_energy_kwh_total)"; a1="$(metric perf_sentinel_scored_avoidable_energy_kwh_total)"
+    g1="$(metric perf_sentinel_scored_carbon_gco2_total)"; c1="$(metric perf_sentinel_scored_avoidable_carbon_gco2_total)"
+    if verdict="$(python3 - "$e0" "$e1" "$a0" "$a1" "$g0" "$g1" "$c0" "$c1" <<'PY'
+import sys
+e0, e1, a0, a1, g0, g1, c0, c1 = map(float, sys.argv[1:])
+de, da, dg, dc = e1 - e0, a1 - a0, g1 - g0, c1 - c0
+ok = 0 < da <= de * (1 + 1e-9) and 0 < dc <= dg * (1 + 1e-9)
+print(f"avoidable {da:.3e} of {de:.3e} kWh, {dc:.3e} of {dg:.3e} gCO2")
+sys.exit(0 if ok else 1)
+PY
+)"; then
+      assert_pass B2 "avoidable counters grow inside their totals: ${verdict}"
+    else
+      assert_fail B2 "avoidable counters out of their totals: ${verdict}"
+    fi
+  else
+    assert_fail B2 "perf_sentinel_scored_avoidable_energy_kwh_total absent (daemon older than 0.48.0?)"
+  fi
   stop_daemon
 else
   assert_fail B1 "daemon refused the broker groups: $(tail -5 "${TMP_DIR}/daemon-broker.log")"
