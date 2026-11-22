@@ -195,6 +195,10 @@ post_shed() {
     -H 'Content-Type: application/x-protobuf' --data-binary @"${SHED_FIX}" 2>/dev/null || true
 }
 
+shed_batches() {  # analysis batches shed so far, 0 when absent
+  curl -fsS "${DAEMON_URL}/metrics" 2>/dev/null | awk '$1 ~ /^perf_sentinel_analysis_shed_batches_total/ {print $2; f=1; exit} END{if(!f)print 0}'
+}
+
 alumet_success_count() {  # successful Alumet scrapes so far (from the daemon's own /metrics)
   curl -fsS "${DAEMON_URL}/metrics" 2>/dev/null | awk '
     index($0,"perf_sentinel_alumet_scrape_total")==1 && index($0,"status=\"success\"")>0 {print int($2); f=1; exit}
@@ -712,13 +716,23 @@ elif start_daemon d.toml d.log; then
   # Daemon starts fresh (cumulative energy 0), so the total successful scrapes at
   # the end == the energy banked, in per-scrape units. That is the ground truth
   # the archived DB energy is checked against.
-  # Flood: concurrent injectors replaying the 300-N+1-trace payload to overrun
-  # the queue. --max-time bounds each POST. A straggler reap avoids a hung wait.
+  # Flood: 8 back-to-back injectors replaying the 300-N+1-trace payload until
+  # the first batch is shed, 15 s at most. The local binary runs with no CPU
+  # limit, and spaced bursts (4 POSTs every 2 s) left the worker time to drain
+  # the 1-deep queue on a fast host: nothing shed and D could not run.
+  # --max-time bounds each POST. A straggler reap avoids a hung wait.
+  FLOOD_END=$((SECONDS + 15))
+  FLOOD_PIDS=()
   for _ in $(seq 1 8); do
-    for _ in $(seq 1 4); do post_shed & done
-    sleep 2
+    ( while [ "${SECONDS}" -lt "${FLOOD_END}" ]; do post_shed; done ) &
+    FLOOD_PIDS+=($!)
   done
-  sleep 4
+  while [ "${SECONDS}" -lt "${FLOOD_END}" ]; do
+    [ "$(shed_batches)" != "0" ] && break
+    sleep 0.5
+  done
+  kill "${FLOOD_PIDS[@]}" 2>/dev/null || true
+  wait "${FLOOD_PIDS[@]}" 2>/dev/null || true
   pkill -f "curl.*${DAEMON_HTTP_PORT}/v1/traces" 2>/dev/null || true
   # Quiesce: stop the flood so the 1-deep queue drains and shedding subsides. The
   # scraper keeps banking DB energy (unconsumed) through this idle window.
@@ -731,7 +745,7 @@ elif start_daemon d.toml d.log; then
   sleep 3
   SCRAPES="$(alumet_success_count)"   # total scrapes since fresh start == energy banked
   DROPS="$(grep -c 'dropping window\|dropping line' "${TMP_DIR}/d.log" 2>/dev/null)"; DROPS="${DROPS:-0}"
-  SHED="$(curl -fsS "${DAEMON_URL}/metrics" 2>/dev/null | awk '$1 ~ /^perf_sentinel_analysis_shed_batches_total/ {print $2; f=1; exit} END{if(!f)print 0}')"
+  SHED="$(shed_batches)"
   ALIVE=0; curl -fsS "${DAEMON_URL}/api/status" >/dev/null 2>&1 && ALIVE=1
   if [ -s "${TMP_DIR}/archive-d.ndjson" ]; then
     python3 - "${TMP_DIR}/archive-d.ndjson" "${PER_SCRAPE_KWH}" "${SCRAPES}" "${DROPS}" > "${TMP_DIR}/d-verdict.txt" <<'EOF'
