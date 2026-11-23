@@ -19,7 +19,7 @@ cd "${REPO_ROOT}"
 
 CNI="${1:-cilium}"
 CNI_MARKER="${REPO_ROOT}/cluster/.cni-active"
-CILIUM_VERSION="1.20.4"
+CILIUM_VERSION="1.20.5"
 
 color_blue()  { printf "\033[34m%s\033[0m\n" "$*"; }
 color_green() { printf "\033[32m%s\033[0m\n" "$*"; }
@@ -108,7 +108,7 @@ case "${CNI}" in
     helm repo update projectcalico >/dev/null
     helm upgrade --install calico projectcalico/tigera-operator \
       --namespace tigera-operator --create-namespace \
-      --version v3.33.0 \
+      --version v3.33.1 \
       --wait --timeout 5m
     step "Waiting for Calico nodes Ready"
     kubectl -n calico-system rollout status daemonset/calico-node --timeout=180s
