@@ -3541,6 +3541,14 @@ intact line per record, under the two content-derived ids the run creates, the
 last shop-svc one carrying the end, and a symlinked `archive_path` refuses
 startup rather than being discovered at the first incident.
 
+**Saturation, 0.49.0.** A last daemon takes one `memory_saturation` alert per
+form of the `perf_sentinel_saturation` annotation, each on its own service: a
+bare ratio (`0.97`), the `humanizePercentage` rendering (`97.35%`), a ratio
+past full (`1.03`, capped at `1.0`), an unreadable value and none at all. The
+listing and the last archive line of each incident must both read the same
+five values, the last two recorded without a `saturation`. Before 0.49.0 the
+field is absent everywhere and the leg fails.
+
 Deliberately not asserted: that the gauge means liveness (a crash, a scale to
 zero, a deploy, a load balancer drain and a quiet cron all read the same), and
 that a finding analysed after the settle fired reaches the record (the settle

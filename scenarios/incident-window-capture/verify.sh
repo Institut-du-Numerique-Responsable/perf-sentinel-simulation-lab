@@ -59,6 +59,10 @@
 #      with that one incident whatever `service`, `namespace`, `offset` and
 #      `limit` say, and with an empty array rather than a 404 when the ring
 #      does not hold it, so a stale id reads as gone and not as a broken route.
+#   J. Saturation (0.49.0). The `perf_sentinel_saturation` annotation lands on
+#      the record and in the archive as a ratio: a bare number as is, a
+#      trailing `%` as a percentage, past full capped at 1, an unreadable or
+#      missing value leaving the incident recorded without one.
 #
 # Local binary, no cluster.
 
@@ -776,6 +780,50 @@ if [ "${SYMLINK_RC}" != "0" ] && grep -qi "symlink" "${TMP_DIR}/d-symlink.log"; 
 else
   fail "rc=${SYMLINK_RC}, log: $(tail -3 "${TMP_DIR}/d-symlink.log")"
   record "symlinked archive refused" FAIL "rc=${SYMLINK_RC}"
+fi
+
+# === Leg J: saturation from an annotation (0.49.0) ===
+step "J. The saturation annotation reaches the record and the archive, as a ratio"
+write_config "${TMP_DIR}/saturation.ndjson"
+start_daemon "d-saturation.log" || die "daemon did not start: $(tail -5 "${TMP_DIR}/d-saturation.log")"
+# One alert per form, each on its own service so each is its own incident: a
+# bare ratio, a humanizePercentage rendering, a ratio past full (capped), an
+# unreadable value and no annotation at all (both recorded without one).
+SAT_BODY="$(python3 -c "
+import json, sys
+cases = [('sat-ratio', '0.97'), ('sat-percent', '97.35%'), ('sat-over', '1.03'),
+         ('sat-bad', 'oops'), ('sat-none', None)]
+print(json.dumps({'version': '4', 'alerts': [
+    {'status': 'firing',
+     'labels': {'service': svc, 'perf_sentinel_kind': 'memory_saturation'},
+     'annotations': {} if v is None else {'perf_sentinel_saturation': v},
+     'startsAt': sys.argv[1], 'endsAt': '0001-01-01T00:00:00Z'}
+    for svc, v in cases]}))
+" "$(rfc3339 "$(now_ms)")")"
+CODE_J="$(api POST /api/incidents "${SAT_BODY}" "${API_KEY}")"
+J_RECORDED="$(jqp "d.get('recorded')" < "${TMP_DIR}/body")"
+SAT_OF="' '.join('%s=%s' % (r['service'], r.get('saturation', 'absent')) for r in sorted(d, key=lambda r: r['service']))"
+api GET "/api/incidents?limit=100" "" "${API_KEY}" >/dev/null
+J_LISTED="$(jqp "${SAT_OF}" < "${TMP_DIR}/body")"
+stop_daemon
+J_ARCHIVED="$(python3 -c "
+import json, sys
+last = {}
+for l in open(sys.argv[1]):
+    if l.strip():
+        r = json.loads(l)
+        last[r['id']] = r
+d = list(last.values())
+print(${SAT_OF})
+" "${TMP_DIR}/saturation.ndjson")"
+J_WANT="sat-bad=absent sat-none=absent sat-over=1.0 sat-percent=0.9735 sat-ratio=0.97"
+if [ "${CODE_J}" = "200" ] && [ "${J_RECORDED}" = "5" ] \
+   && [ "${J_LISTED}" = "${J_WANT}" ] && [ "${J_ARCHIVED}" = "${J_WANT}" ]; then
+  ok "five incidents recorded, listed and archived as ${J_WANT}"
+  record "saturation read from the annotation" PASS "ratio, percentage, capped, unreadable and absent"
+else
+  fail "HTTP ${CODE_J}, recorded=${J_RECORDED}, listed '${J_LISTED}', archived '${J_ARCHIVED}', want '${J_WANT}'"
+  record "saturation read from the annotation" FAIL "listed '${J_LISTED}'"
 fi
 
 # === Report ===
