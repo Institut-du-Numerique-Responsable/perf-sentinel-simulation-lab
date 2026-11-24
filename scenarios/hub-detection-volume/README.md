@@ -30,6 +30,7 @@ A local Hub knows three sources, and both daemons receive the same N+1
 | H4 | the finding's `detections` is the sum of its sources, and incomplete |
 | H5 | the same finding read without `from` or `to` carries none of the seven new names |
 | H6 | `perf_sentinel_hub_detection_reads_total{source="hdv-poll",outcome="ok"}` is above 0 on `/metrics` |
+| H7 | from a 0.50.0 daemon and a 0.22.0 Hub, every ledger of `hdv-poll`, read by the `split=grouping` poll, and of `hdv-push`, pushed to `/api/import/detections/by-grouping`, is stored split (`detection_ledgers.split`). Older pairs read it not applicable |
 
 `hub-derived-status` needed no change for the Hub's `last_seen` fix: it pushes
 its envelopes with `stored_at_ms` at the push time, which is the time the Hub

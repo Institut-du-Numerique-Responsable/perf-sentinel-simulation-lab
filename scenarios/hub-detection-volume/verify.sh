@@ -20,6 +20,8 @@
 #   H4 the finding's count is the sum of its sources, and incomplete.
 #   H5 a read without from or to carries none of the seven new names.
 #   H6 perf_sentinel_hub_detection_reads_total counts the poll's passes.
+#   H7 from a 0.50.0 daemon and a 0.22.0 Hub, every ledger of hdv-poll (the
+#      split poll) and of hdv-push (the by-grouping push) is stored split.
 #
 # On Hub 0.8.5 the windowed read carries no `detections` and H1 fails.
 set -euo pipefail
@@ -389,6 +391,27 @@ READS_OK="$(curl -fsS "${HUB_URL}/metrics" | awk '/^perf_sentinel_hub_detection_
 [ -n "${READS_OK}" ] && [ "${READS_OK%.*}" -gt 0 ] || die "H6 detection_reads_total{source=\"hdv-poll\",outcome=\"ok\"} is '${READS_OK}'"
 ok "hdv-poll: ${READS_OK} passes ended ok"
 
+step "H7 both routes store the ledger split by grouping"
+FORMS="n/a"
+if python3 -c 'import sys; v = lambda s: tuple(int(x) for x in s.split("-")[0].split("."))
+sys.exit(0 if v(sys.argv[1]) >= (0, 50, 0) and v(sys.argv[2]) >= (0, 22, 0) else 1)' "${BIN_VERSION}" "${HUB_VERSION}" 2>/dev/null; then
+  FORMS="$(python3 - "${TMP_DIR}/hub.db" <<'PY'
+import sqlite3, sys
+con = sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True)
+rows = con.execute("SELECT source_id, ledger_id, split FROM detection_ledgers"
+                   " WHERE source_id IN ('hdv-poll', 'hdv-push') ORDER BY source_id").fetchall()
+print(" ".join(f"{s}:{'split' if split else 'unsplit'}" for s, _, split in rows) or "none")
+PY
+)"
+  case "${FORMS}" in
+    *unsplit*|none) die "H7 stored ledger forms: ${FORMS}, want every hdv-poll and hdv-push ledger split" ;;
+  esac
+  case "${FORMS}" in *hdv-poll:split*hdv-push:split*) ;; *) die "H7 stored ledger forms: ${FORMS}, want hdv-poll and hdv-push" ;; esac
+  ok "stored split: ${FORMS}"
+else
+  ok "H7 not applicable: daemon ${BIN_VERSION}, Hub ${HUB_VERSION}"
+fi
+
 {
   echo "# Scenario: ${SCENARIO}"
   echo ""
@@ -403,6 +426,7 @@ ok "hdv-poll: ${READS_OK} passes ended ok"
   echo "| H4 | finding level | ${F_TOTAL} = sum of sources, complete=false |"
   echo "| H5 | unwindowed read | no detection field |"
   echo "| H6 | /metrics | ${READS_OK} ok passes for hdv-poll |"
+  echo "| H7 | ledger form by route | ${FORMS} |"
   echo ""
   echo "Verdict: **PASS**"
 } > "${REPORT}"
