@@ -18,8 +18,17 @@
 #   V6 detections added just before SIGTERM reach the fake Hub: only the
 #      drain's forced push can carry them, the next regular round being a
 #      minute away.
+#   V7 (0.50.0) one N+1 in two namespaces: ?split=grouping answers one row
+#      per grouping, the unsplit route one row summing them.
+#   V8 a limit=1 walk of the split ledger, next_after + next_after_grouping,
+#      returns the same rows.
+#   V9 the push goes to /api/import/detections/by-grouping with the split
+#      rows, and never to the older route.
+#   V10 a Hub answering 404 on the split route (one that predates it): the
+#      next daemon life pushes to /api/import/detections, groupings summed.
 #
-# On 0.36.0 the route does not exist (404) and V1 fails.
+# On 0.36.0 the route does not exist (404) and V1 fails. On 0.49.0 the
+# ledger has no split and V7 fails.
 set -euo pipefail
 
 SCENARIO="detection-volume"
@@ -92,17 +101,22 @@ EOF
 python3 -c 'print("k" * 32)' > "${TMP_DIR}/hub.key"
 chmod 600 "${TMP_DIR}/hub.key"
 
-# Answers 200 to every import and appends {path, body} per POST to pushes.jsonl.
+# Answers 200 to every import and appends {path, status, body} per POST to
+# pushes.jsonl. Once <pushes>.no-split exists, it answers 404 on the split
+# detection route, like a Hub that predates it.
 cat > "${TMP_DIR}/fake_hub.py" <<'HUBPY'
-import json, sys
+import json, os, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 port, out = int(sys.argv[1]), sys.argv[2]
 class H(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        status = 404 if (self.path.startswith("/api/import/detections/by-grouping")
+                         and os.path.exists(out + ".no-split")) else 200
         with open(out, "a") as f:
-            f.write(json.dumps({"path": self.path, "body": body.decode("utf-8", "replace")}) + "\n")
-        self.send_response(200)
+            f.write(json.dumps({"path": self.path, "status": status,
+                                "body": body.decode("utf-8", "replace")}) + "\n")
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(b'{"accepted":0,"rejected":0}')
@@ -118,31 +132,50 @@ for _ in $(seq 1 20); do
   sleep 0.25
 done
 
-# Summarizes the detection pushes: per ledger the max planted count, the
-# days that arrived with a day object, and those marked gap=true.
+# Summarizes the accepted detection pushes, on either route: per ledger the
+# planted count (max per row, summed over groupings), the routes taken
+# ("split" or "unsplit") with the pages' "split" field, the dv-split rows
+# per route and grouping, the days that arrived with a day object, and those
+# marked gap=true. "refused" lists the ledgers whose split pages got a 404.
 push_summary() {
   python3 - "${TMP_DIR}/pushes.jsonl" "${SOURCE_ID}" <<'SUMPY'
 import json, sys
 path, source = sys.argv[1], sys.argv[2]
-planted, gaps, days = {}, {}, set()
+split_route = "/api/import/detections/by-grouping?source_id=" + source
+unsplit_route = "/api/import/detections?source_id=" + source
+rows, routes, gaps, days, refused = {}, {}, {}, set(), set()
 try:
     lines = open(path).read().splitlines()
 except FileNotFoundError:
     lines = []
 for line in lines:
     rec = json.loads(line)
-    if not rec["path"].startswith("/api/import/detections?source_id=" + source):
+    route = ("split" if rec["path"].startswith(split_route)
+             else "unsplit" if rec["path"].startswith(unsplit_route) else None)
+    if route is None:
         continue
     page = json.loads(rec["body"])
     led = page["ledger_id"]
+    if rec.get("status", 200) != 200:
+        refused.add(led)
+        continue
+    routes.setdefault(led, set()).add("%s:%s" % (route, page.get("split", "-")))
     for r in page.get("counts", []):
-        if r["signature"].startswith("n_plus_one_sql:dv-planted:"):
-            planted[led] = max(planted.get(led, 0), r["detections"])
+        key = (led, route, r["signature"], r.get("grouping", ""))
+        rows[key] = max(rows.get(key, 0), r["detections"])
     for d in page.get("days", []):
         days.add((led, d["day"]))
         if d["gap"]:
             gaps.setdefault(led, set()).add(d["day"])
-print(json.dumps({"planted": planted, "gaps": {k: sorted(v) for k, v in gaps.items()},
+planted, dv_split = {}, {}
+for (led, route, sig, grp), n in rows.items():
+    if sig.startswith("n_plus_one_sql:dv-planted:"):
+        planted[led] = planted.get(led, 0) + n
+    if sig.startswith("n_plus_one_sql:dv-split:"):
+        dv_split.setdefault(led, {})["%s/%s" % (route, grp or "-")] = n
+print(json.dumps({"planted": planted, "routes": {k: sorted(v) for k, v in routes.items()},
+                  "dv_split": dv_split, "refused": sorted(refused),
+                  "gaps": {k: sorted(v) for k, v in gaps.items()},
                   "days": sorted(f"{l}:{d}" for l, d in days)}))
 SUMPY
 }
@@ -183,6 +216,9 @@ from opentelemetry.proto.trace.v1 import trace_pb2 as trace
 
 out, planted, fillers = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 base = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+# Optional: the planted traces' service and k8s.namespace.name.
+service = sys.argv[5] if len(sys.argv) > 5 else "dv-planted"
+namespace = sys.argv[6] if len(sys.argv) > 6 else None
 now = time.time_ns()
 
 def kv(k, v):
@@ -206,12 +242,15 @@ def n1_trace(tid, table):
                         kv("db.statement", "SELECT * FROM %s WHERE id = %d" % (table, i + 1))]))
     return spans
 
-def resource_spans(service, spans):
+def resource_spans(service, spans, namespace=None):
+    attrs = [kv("service.name", service)]
+    if namespace:
+        attrs.append(kv("k8s.namespace.name", namespace))
     return trace.ResourceSpans(
-        resource=resource.Resource(attributes=[kv("service.name", service)]),
+        resource=resource.Resource(attributes=attrs),
         scope_spans=[trace.ScopeSpans(spans=spans)])
 
-rs = [resource_spans("dv-planted", [s for t in range(planted) for s in n1_trace(0xD0000 + base + t, "orders")])]
+rs = [resource_spans(service, [s for t in range(planted) for s in n1_trace(0xD0000 + base + t, "orders")], namespace)]
 # Fillers after the planted traces, so the ring ends up holding them.
 rs += [resource_spans("dv-filler-%d" % f, n1_trace(0xF0000 + f, "items")) for f in range(fillers)]
 open(out, "wb").write(svc.ExportTraceServiceRequest(resource_spans=rs).SerializeToString())
@@ -315,6 +354,85 @@ CURRENT_DAY="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['
 LEDGER_1="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['detection_ledger']['ledger_id'])" "${TMP_DIR}/status1.json")"
 ok "current_day ${CURRENT_DAY}, ledger ${LEDGER_1}"
 
+post_pb() {  # $1 = payload file, $2 = leg id
+  local code
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -X POST "${DAEMON_URL}/v1/traces" \
+    -H 'Content-Type: application/x-protobuf' --data-binary @"$1")"
+  [ "${code}" = "200" ] || die "$2 OTLP POST answered ${code}"
+}
+
+# One N+1 of service dv-split in two namespaces, SPLIT_A then SPLIT_B traces.
+SPLIT_A=4
+SPLIT_B=2
+post_split() {  # $1 = trace id base, $2 = leg id
+  python3 "${TMP_DIR}/build_payload.py" "${TMP_DIR}/split-a.pb" "${SPLIT_A}" 0 "$1" dv-split dv-ns-a
+  python3 "${TMP_DIR}/build_payload.py" "${TMP_DIR}/split-b.pb" "${SPLIT_B}" 0 "$(($1 + 100))" dv-split dv-ns-b
+  post_pb "${TMP_DIR}/split-a.pb" "$2"
+  post_pb "${TMP_DIR}/split-b.pb" "$2"
+}
+
+step "V7 ?split=grouping answers one row per grouping, the unsplit route their sum"
+post_split 2000 V7
+# Prints "<http code> <split field> <dv-split rows as grouping=count,...> <unsplit dv-split rows>".
+read_split() {
+  local code
+  code="$(curl -sS -o "${TMP_DIR}/split.json" -w '%{http_code}' --max-time 10 \
+    "${DAEMON_URL}/api/detections?split=grouping&limit=5000")" || code="000"
+  [ "${code}" = "200" ] || { echo "${code} - - -"; return 0; }
+  curl -fsS "${DAEMON_URL}/api/detections?limit=5000" > "${TMP_DIR}/unsplit.json" || { echo "000 - - -"; return 0; }
+  python3 - "${TMP_DIR}/split.json" "${TMP_DIR}/unsplit.json" <<'PY'
+import json, sys
+sp, un = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+mine = lambda p: [r for r in p["counts"] if r["signature"].startswith("n_plus_one_sql:dv-split:")]
+fmt = lambda rows: ",".join("%s=%d" % (r.get("grouping", "-"), r["detections"]) for r in rows) or "none"
+print(200, sp.get("split", "-"), fmt(mine(sp)), fmt(mine(un)))
+PY
+}
+WANT_SPLIT="dv-ns-a=${SPLIT_A},dv-ns-b=${SPLIT_B}"
+WANT_UNSPLIT="-=$((SPLIT_A + SPLIT_B))"
+for _ in $(seq 1 40); do
+  read -r SPLIT_CODE SPLIT_FIELD SPLIT_ROWS UNSPLIT_ROWS <<< "$(read_split)"
+  [ "${SPLIT_CODE}" = "200" ] || break
+  [ "${SPLIT_ROWS}" = "${WANT_SPLIT}" ] && [ "${UNSPLIT_ROWS}" = "${WANT_UNSPLIT}" ] && break
+  sleep 0.5
+done
+[ "${SPLIT_CODE}" = "200" ] || die "V7 GET /api/detections?split=grouping answered ${SPLIT_CODE}"
+[ "${SPLIT_FIELD}" = "grouping" ] || die "V7 the split page says split=${SPLIT_FIELD}, want grouping (0.50.0)"
+[ "${SPLIT_ROWS}" = "${WANT_SPLIT}" ] || die "V7 split rows ${SPLIT_ROWS}, want ${WANT_SPLIT}"
+[ "${UNSPLIT_ROWS}" = "${WANT_UNSPLIT}" ] || die "V7 unsplit rows ${UNSPLIT_ROWS}, want one ungrouped row ${WANT_UNSPLIT}"
+ok "split: ${SPLIT_ROWS}, unsplit: ${UNSPLIT_ROWS}"
+
+step "V8 a limit=1 walk of the split ledger returns the same rows"
+SPLIT_PAGES="$(python3 - "${DAEMON_URL}" "${TMP_DIR}/split.json" <<'PY'
+import json, sys, urllib.parse, urllib.request
+url, whole = sys.argv[1], json.load(open(sys.argv[2]))
+rows, after, after_grouping, pages = [], None, None, 0
+while True:
+    q = {"limit": "1", "split": "grouping"}
+    if after is not None:
+        q["after"] = after
+        q["after_grouping"] = after_grouping
+    with urllib.request.urlopen(url + "/api/detections?" + urllib.parse.urlencode(q), timeout=10) as r:
+        p = json.load(r)
+    pages += 1
+    if p["ledger_id"] != whole["ledger_id"]:
+        sys.exit("ledger_id changed during the walk")
+    rows += [(c["day"], c["signature"], c.get("grouping", ""), c["detections"]) for c in p["counts"]]
+    after, after_grouping = p["next_after"], p.get("next_after_grouping")
+    if after is None:
+        break
+    if after_grouping is None:
+        sys.exit("a split page carried next_after without next_after_grouping")
+    if pages > 10000:
+        sys.exit("no end after 10000 pages")
+want = [(c["day"], c["signature"], c.get("grouping", ""), c["detections"]) for c in whole["counts"]]
+if rows != want:
+    sys.exit("walked rows differ from the single page: %d vs %d" % (len(rows), len(want)))
+print(pages)
+PY
+)" || die "V8 ${SPLIT_PAGES:-split walk failed}"
+ok "${SPLIT_PAGES} pages, same rows as the single split page"
+
 step "V5 the push to the fake Hub carries the planted count"
 # The detection half pushes at most once a minute.
 V5_PLANTED=0
@@ -328,6 +446,22 @@ done
 push_summary | python3 -c "import json,sys; s=json.load(sys.stdin); sys.exit(0 if any(x.startswith(sys.argv[1] + ':') for x in s['days']) else 1)" "${LEDGER_1}" \
   || die "V5 no day object pushed for ledger ${LEDGER_1}"
 ok "push carried ${V5_PLANTED} planted detections and a day object"
+
+step "V9 the push takes the split route with the split rows"
+WANT_PUSH='{"split/dv-ns-a": '"${SPLIT_A}"', "split/dv-ns-b": '"${SPLIT_B}"'}'
+V9=""
+for _ in $(seq 1 100); do
+  V9="$(push_summary | python3 -c "
+import json,sys
+s = json.load(sys.stdin); led = sys.argv[1]
+print(json.dumps(s['dv_split'].get(led, {}), sort_keys=True), ' '.join(s['routes'].get(led, [])))" "${LEDGER_1}")"
+  [ "${V9% *}" = "${WANT_PUSH}" ] && break
+  sleep 1
+done
+V9_ROWS="${V9% *}"; V9_ROUTES="${V9##* }"
+[ "${V9_ROWS}" = "${WANT_PUSH}" ] || die "V9 pushed dv-split rows ${V9_ROWS}, want ${WANT_PUSH}"
+[ "${V9_ROUTES}" = "split:grouping" ] || die "V9 ledger ${LEDGER_1} pushed on ${V9_ROUTES}, want split:grouping only"
+ok "split route only, rows ${V9_ROWS}"
 
 step "V4 a restart opens a new ledger, today is a gap, nothing carried over"
 # V6 setup: ${EXTRA} more planted detections, then SIGTERM before the next
@@ -345,6 +479,8 @@ for _ in $(seq 1 40); do
 done
 [ "${NOW_PLANTED}" = "${WANT_TOTAL}" ] || die "V6 the ledger shows ${NOW_PLANTED} planted detections, want ${WANT_TOTAL}"
 stop_daemon
+# V10 setup: from now on the fake Hub has no split route.
+touch "${TMP_DIR}/pushes.jsonl.no-split"
 start_daemon
 curl -fsS "${DAEMON_URL}/api/status" > "${TMP_DIR}/status2.json" || die "V4 /api/status unreadable after restart"
 LEDGER_2="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['detection_ledger']['ledger_id'])" "${TMP_DIR}/status2.json")" \
@@ -370,6 +506,22 @@ V6_PLANTED="$(push_summary | python3 -c "import json,sys; print(json.load(sys.st
   || die "V6 the fake Hub holds ${V6_PLANTED} planted detections for ledger ${LEDGER_1}, want ${WANT_TOTAL}: the drain did not push"
 ok "drain push carried ${V6_PLANTED} planted detections"
 
+step "V10 a Hub without the split route: the next life pushes unsplit"
+post_split 4000 V10
+V10=""
+for _ in $(seq 1 100); do
+  V10="$(push_summary | python3 -c "
+import json,sys
+s = json.load(sys.stdin); led = sys.argv[1]
+print(json.dumps(s['dv_split'].get(led, {}), sort_keys=True), led in s['refused'], ' '.join(s['routes'].get(led, [])))" "${LEDGER_2}")"
+  [ "${V10%% *}" = '{"unsplit/-":' ] && break
+  sleep 1
+done
+WANT_V10='{"unsplit/-": '"$((SPLIT_A + SPLIT_B))"'} True unsplit:-'
+[ "${V10}" = "${WANT_V10}" ] \
+  || die "V10 ledger ${LEDGER_2}: ${V10}, want ${WANT_V10} (refused split pages, then the older route, groupings summed)"
+ok "split route refused with 404, then ${V10%% True*} on the older route"
+
 {
   echo "# Scenario: ${SCENARIO}"
   echo ""
@@ -383,6 +535,10 @@ ok "drain push carried ${V6_PLANTED} planted detections"
   echo "| V4 | restart | new ledger_id, today gap=true, planted count 0 |"
   echo "| V5 | push to a fake Hub | ${V5_PLANTED}/${PLANTED} planted detections and a day object |"
   echo "| V6 | drain push at SIGTERM | ${V6_PLANTED}/${WANT_TOTAL} planted detections reached the fake Hub |"
+  echo "| V7 | ?split=grouping, one N+1 in two namespaces | split ${SPLIT_ROWS}, unsplit ${UNSPLIT_ROWS} |"
+  echo "| V8 | limit=1 walk of the split ledger | ${SPLIT_PAGES} pages, same rows |"
+  echo "| V9 | push on /api/import/detections/by-grouping | ${V9_ROWS}, route ${V9_ROUTES} |"
+  echo "| V10 | Hub without the split route (404) | ${V10} |"
   echo ""
   echo "Verdict: **PASS**"
 } > "${REPORT}"

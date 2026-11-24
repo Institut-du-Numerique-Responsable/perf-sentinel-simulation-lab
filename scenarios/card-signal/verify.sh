@@ -214,7 +214,7 @@ except FileNotFoundError:
     sys.exit(1)
 for line in lines:
     rec = json.loads(line)
-    if rec["path"].startswith("/api/import/detections?source_id=" + source) and rec["status"] == status \
+    if rec["path"].replace("/by-grouping?", "?", 1).startswith("/api/import/detections?source_id=" + source) and rec["status"] == status \
             and json.loads(rec["body"]).get("ledger_id") == ledger:
         sys.exit(0)
 sys.exit(1)
@@ -232,7 +232,7 @@ path, source, ledger, day = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[
 pages = []
 for line in open(path).read().splitlines():
     rec = json.loads(line)
-    if not rec["path"].startswith("/api/import/detections?source_id=" + source):
+    if not rec["path"].replace("/by-grouping?", "?", 1).startswith("/api/import/detections?source_id=" + source):
         continue
     page = json.loads(rec["body"])
     if page["ledger_id"] != ledger:

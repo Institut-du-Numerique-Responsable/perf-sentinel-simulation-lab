@@ -182,7 +182,7 @@ except FileNotFoundError:
 pages = []
 for line in lines:
     rec = json.loads(line)
-    if not rec["path"].startswith("/api/import/detections?source_id=" + source):
+    if not rec["path"].replace("/by-grouping?", "?", 1).startswith("/api/import/detections?source_id=" + source):
         continue
     page = json.loads(rec["body"])
     if page["ledger_id"] != ledger:
